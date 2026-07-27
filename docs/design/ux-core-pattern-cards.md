@@ -115,6 +115,12 @@ Format: **pattern** — meaning. **Use:** practical UI application. **Risk:** wh
 
 ## Application rule
 
+Each production UX review must reference an exact pattern-card heading from this
+file. If a concept is not represented by a card, record `No pattern selected`
+instead of inventing a source-backed claim. A selected card must be classified
+as `source-backed`, `adapted`, or `hypothesis`, and its finding must include
+priority and validation method in `ux-review-template.md`.
+
 ## Additional cards
 
 - **Out-group homogeneity** — outsiders are seen as more alike than insiders. **Use:** allow individual roles, needs, and preferences to remain visible. **Risk:** do not collapse users into broad segments.

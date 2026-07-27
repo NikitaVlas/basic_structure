@@ -31,6 +31,17 @@
 - [ ] Есть setup, development, test, build и full verification commands.
 - [ ] Определены обязательные проверки для типов изменений.
 
+## Mandatory quality gates
+
+- [ ] A feature quality plan template is available and included in the delivery flow.
+- [ ] Frontend security capability assessed and selected when frontend code exists.
+- [ ] Backend/API security capability assessed and selected when backend or APIs exist.
+- [ ] Unit, integration, and contract/API testing capabilities defined from the start.
+- [ ] E2E testing capability defined for user-facing flows, or explicitly marked N/A.
+- [ ] Test matrix covers every changed behavior and affected boundary.
+- [ ] Security acceptance criteria and verification commands are defined before implementation.
+- [ ] Full verification gate includes tests, security checks, build, and applicable UX/accessibility/visual checks.
+
 ## Readiness
 
 - [ ] Существенные open questions закрыты или приняты как риск.

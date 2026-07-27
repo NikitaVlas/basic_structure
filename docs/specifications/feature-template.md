@@ -87,6 +87,8 @@ feedback. Use `Not applicable` for non-UI work.
 ## Security
 
 Describe access, sensitive data, rate limits, auditing, and abuse cases.
+Add security acceptance criteria and the threat-model assumptions that must be
+verified before completion.
 
 ## Failure behavior
 
@@ -112,15 +114,41 @@ Describe required logs, metrics, traces, and events.
 
 ### Unit
 
+- Covers:
+- Acceptance criteria:
+- Negative cases:
+
 ### Integration
+
+- Boundaries covered:
+- Failure cases:
 
 ### Contract
 
+- API/schema compatibility:
+- Authorization and error responses:
+
 ### E2E
+
+- Critical journeys:
+- User roles and permission paths:
 
 ### Visual
 
+- Responsive states:
+- Visual regression scope:
+
 ### Manual
+
+- Security review:
+- Accessibility review:
+- Residual risks:
+
+### Coverage matrix
+
+| Requirement / acceptance criterion | Test level | Test reference | Status |
+|---|---|---|---|
+| AC-001 | Unit / Integration / Contract / E2E / Visual / N/A | TBD | TBD |
 
 ## Constraints
 
@@ -138,11 +166,15 @@ Complete this section after code research and before implementation approval.
 - Frontend implementation skill required: No / Yes
 - Figma or visual design skill required: No / Yes
 - Skill review recorded in: `agent/skill-review.md`
+- UX review recorded in: `docs/design/ux-review-template.md` when UI or user-facing flow exists
 - Approval required for new skills: No / Yes
 
 If this feature introduces a UI or user-facing flow, activate the relevant
 UX/product and frontend skills before implementation. If it does not, mark the
 UI/UX fields as `Not applicable` or `No` and do not activate those skills.
+
+For UI work, complete `docs/design/ux-review-template.md` before implementation
+and complete its after-implementation audit before marking the feature Verified.
 
 ## Open questions
 
@@ -153,6 +185,10 @@ UI/UX fields as `Not applicable` or `No` and do not activate those skills.
 Complete after code research and specification approval.
 
 ## Verification results
+
+Link the completed feature-specific quality plan from
+`docs/development/quality-plans/` and summarize passed checks, coverage gaps,
+security findings, UX findings, and residual risks.
 
 Record commands, outcomes, skipped checks, and manual evidence.
 

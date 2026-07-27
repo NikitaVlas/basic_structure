@@ -19,16 +19,36 @@ Mark non-applicable items explicitly and explain material exceptions.
 
 ## Tests
 
+- [ ] The coverage matrix maps every acceptance criterion to a test or an approved `Not applicable` reason.
+- [ ] Unit tests cover changed logic, validation, and error handling.
+- [ ] Integration tests cover changed module, data, and service boundaries.
+- [ ] Contract/API tests cover changed public schemas and error behavior when applicable.
+- [ ] E2E tests cover critical user journeys when a user-facing flow exists.
+- [ ] Negative tests cover invalid input, unauthorized access, and relevant failure paths.
+- [ ] Accessibility and visual tests were run for applicable UI changes.
 - [ ] Required tests were added or updated.
 - [ ] A regression test covers a fixed reproducible bug when feasible.
-- [ ] Required verification passed.
+- [ ] Test results and meaningful coverage gaps are recorded.
 - [ ] Skipped or unavailable checks are listed.
 
 ## Security
 
-- [ ] Permissions, validation, and negative cases were reviewed.
+- [ ] A threat model or security-impact assessment was completed before implementation.
+- [ ] Security acceptance criteria are verified.
+- [ ] Authentication, authorization, object-level permissions, and negative cases were reviewed.
+- [ ] Input validation, output encoding, injection, XSS/CSRF, rate limits, and error disclosure were checked as applicable.
+- [ ] Dependencies and lock files received the required security audit.
 - [ ] Secrets and sensitive data were not exposed.
 - [ ] Security-sensitive changes received the required review.
+
+## Verification gates
+
+- [ ] Lint, typecheck, build, and required project checks passed.
+- [ ] Security checks and dependency scan passed or have approved exceptions.
+- [ ] Full verification command passed.
+- [ ] UX/product audit was completed for UI or user-facing flow changes.
+- [ ] Accessibility review was completed for UI changes.
+- [ ] Any failed, skipped, or unavailable check has a reason, owner, and follow-up.
 
 ## Data
 
@@ -46,6 +66,8 @@ Mark non-applicable items explicitly and explain material exceptions.
 
 ## Documentation
 
+- [ ] A feature-specific quality plan exists under `docs/development/quality-plans/`.
+- [ ] The quality plan contains the threat model, test coverage matrix, findings, and verification summary.
 - [ ] Documentation affected by the change was updated.
 - [ ] Significant decisions were recorded in an ADR.
 - [ ] Outdated information was corrected or marked `Outdated`.

@@ -21,6 +21,42 @@ Use `Not applicable — <reason>` where a check does not apply.
 
 Prefer one `verify` command that runs the standard local and CI checks.
 
+## Mandatory quality gates
+
+Every project must define these gates from initialization. A gate may be
+marked `Not applicable` only with a documented reason and owner approval.
+
+### Test coverage
+
+- Unit tests cover changed business logic, validators, transformations, and
+  error handling.
+- Integration tests cover changed module, database, queue, and service
+  boundaries.
+- Contract/API tests cover schemas, permissions, status codes, errors, and
+  backward compatibility when an API or integration exists.
+- E2E tests cover critical user journeys when a user-facing flow exists.
+- Regression tests reproduce and prevent every fixed bug.
+- Accessibility and visual tests cover applicable UI changes.
+- Negative tests cover invalid input, unauthorized access, missing resources,
+  timeouts, retries, and partial failures where relevant.
+- The feature specification maps each acceptance criterion to one or more test
+  scenarios. Untested criteria are a completion blocker.
+
+### Security coverage
+
+Before implementation, record a lightweight threat model and security
+acceptance criteria covering, as applicable:
+
+- authentication, authorization, roles, and object-level access;
+- input validation, output encoding, XSS, CSRF, injection, and unsafe parsing;
+- secrets, sensitive data, logs, cookies, headers, CORS, and CSP;
+- rate limits, abuse cases, replay, resource exhaustion, and error disclosure;
+- dependency and lock-file audit, migrations, backups, and data retention.
+
+Security review must include positive and negative permission tests and a
+dependency/security scan. A green functional test suite alone is not a
+security sign-off.
+
 ## Required by change type
 
 | Change type | Required checks |

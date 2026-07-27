@@ -20,15 +20,29 @@ permissions → capabilities → reviewed tooling → verification → readiness
 
 1. Complete `docs/questionnaires/feature-init.md`.
 2. Research current behavior and affected code.
-3. Create a feature specification from the answers and evidence.
-4. Resolve open questions and obtain approval.
-5. Add an implementation plan to the approved specification.
-6. Implement only the approved scope.
-7. Add tests selected from the testing and verification matrices.
-8. Run required verification.
-9. Review the diff and acceptance criteria.
-10. Record verification results and known limitations.
-11. Update only documentation made stale by the change.
+3. Run a scoped `find-skills` review. Always assess frontend security,
+   backend/API security, and testing capabilities; assess UX only when an
+   interface or user-facing flow exists.
+4. Validate candidate skills for source, pinning, platform compatibility,
+   scripts, dependencies, and a minimal smoke test before approval.
+5. Create a feature specification from the answers and evidence.
+6. Resolve open questions and obtain approval.
+7. Define UX decisions when applicable, security acceptance criteria, and a
+   test matrix before implementation.
+8. Copy `docs/development/quality-plan-template.md` to
+   `docs/development/quality-plans/SPEC-XXXX-quality.md` and approve it for the
+   feature.
+9. Add an implementation plan to the approved specification.
+10. Implement only the approved scope.
+11. Update the feature-specific quality plan with test references and findings
+    during work.
+12. Add tests for all changed behavior and affected boundaries.
+13. Run security review and the required verification matrix.
+14. Run UX/accessibility audit when UI is in scope.
+15. Review the diff and acceptance criteria.
+16. Record coverage, verification results, findings, and known limitations in
+    the specification and feature-specific quality plan.
+17. Update only documentation made stale by the change.
 
 Specification lifecycle:
 

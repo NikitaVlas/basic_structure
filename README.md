@@ -1,5 +1,12 @@
 # Project starter
 
+## Start command
+
+Use the exact phrase `СТАРТ ПРОЕКТА` to begin a new project initialization with
+the AI agent. The agent then collects context, asks the initialization
+questions, researches the repository, runs `find-skills`, defines security and
+testing requirements, and follows the documented workflow step by step.
+
 Базовая структура для быстрого и качественного старта проекта с AI-агентом.
 
 ## С чего начать

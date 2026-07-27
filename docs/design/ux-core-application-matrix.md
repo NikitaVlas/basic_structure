@@ -2,6 +2,19 @@
 
 Use this matrix to choose a starting set of patterns. It is a heuristic, not a substitute for user research or validation.
 
+Choose the matching review mode in `ux-review-template.md` before selecting
+patterns. The matrix suggests candidates; it never establishes evidence by
+itself.
+
+| Review mode | Primary artifact | Required output |
+|---|---|---|
+| marketing | UX review template | Promise, evidence, CTA, ethical persuasion, validation |
+| product UI | UX review template | Task flow, hierarchy, states, permissions, validation |
+| admin-operational UI | UX review template | Queue/density, prioritization, recovery, keyboard, validation |
+| onboarding | UX review template | First value, progressive disclosure, education, validation |
+| forms | UX review template | Fields, defaults, validation, errors, safe exit |
+| accessibility review | UX review template | Semantics, keyboard, focus, contrast, announcements, validation |
+
 | UI / product task | Start with these patterns | Main question |
 |---|---|---|
 | Landing page / positioning | Framing effect, Anchoring effect, Availability heuristics, Context effect, Von Restorff effect | Is the value understood and framed honestly? |

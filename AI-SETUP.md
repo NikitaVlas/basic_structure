@@ -3,6 +3,14 @@
 This starter separates project context, optional modules, and environment-level
 tooling. It does not install skills, MCP servers, or dependencies automatically.
 
+## Start command
+
+When the user sends the exact phrase `СТАРТ ПРОЕКТА`, begin the initialization
+flow. Do not jump straight to implementation. Collect project context, ask the
+questionnaire questions in manageable groups, research the repository, run the
+skill discovery review, define security and testing gates, and continue only
+after the relevant decisions are clear.
+
 ## Initialization
 
 Use `README.md` as the entry point and complete
@@ -29,6 +37,50 @@ new capability. This includes a UI, user-facing flow, new document format,
 external integration, deployment concern, testing requirement, or security
 requirement. Record the result in `agent/skill-review.md` before implementation
 approval.
+
+## Required project flow
+
+Use this order after initialization and for each feature:
+
+1. Collect project, user, business, technical, and constraint information.
+2. Run the **skill discovery review** with `find-skills`. Always assess
+   frontend security, backend/API security, and testing capabilities; add other
+   capabilities only when the project requires them.
+3. If an interface or user-facing flow is in scope, select the applicable UX
+   review mode and patterns using the project documents in `docs/design/`.
+4. Produce UX decisions and acceptance criteria before visual UI work.
+5. Define the test plan and security acceptance criteria before implementation.
+6. Copy `docs/development/quality-plan-template.md` to a feature-specific path
+   such as `docs/development/quality-plans/SPEC-XXXX-quality.md` and approve its threat model,
+   coverage matrix, and required checks.
+7. Implement the approved scope with frontend/backend security controls.
+8. Update the quality plan and add tests covering changed behavior and
+   affected boundaries.
+9. Run the post-implementation UX audit when UI is in scope.
+10. Run the full verification gate: tests, security checks, accessibility/visual
+   checks when applicable, build, and documented project checks.
+11. Record unresolved findings, coverage gaps, and verification results before
+    completion.
+
+The UX sequence is mandatory when UI work is identified:
+
+`need identified -> UX design -> UI implementation -> UX/accessibility audit`
+
+For every project, the delivery sequence also includes:
+
+`requirements -> security design -> implementation -> tests -> security review -> full verification`
+
+No feature is complete without evidence that its changed behavior and relevant
+security boundaries are tested. Record the applicable level as not applicable,
+unit, integration, contract/API, E2E, or visual.
+
+Use `docs/design/UX_PRODUCT_PLAYBOOK.md` as the project-level UX source of
+truth. Use `docs/design/ux-review-template.md` for repeatable reviews and the
+pattern catalog, cards, matrix, and preflight checklist when selecting or
+checking specific UX patterns. Do not rely on a global copy of the UX skill.
+
+Do not activate UI/UX skills when the project or feature has no interface or
+user-facing flow.
 
 ## Skill discovery review
 
