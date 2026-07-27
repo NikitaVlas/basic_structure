@@ -126,6 +126,24 @@ Describe required logs, metrics, traces, and events.
 
 What must not change?
 
+## Skill impact review
+
+Complete this section after code research and before implementation approval.
+
+- New capabilities:
+- Existing skills affected:
+- New skills required:
+- UI or user-facing flow: Not applicable / Required
+- UX/product review required: No / Yes
+- Frontend implementation skill required: No / Yes
+- Figma or visual design skill required: No / Yes
+- Skill review recorded in: `agent/skill-review.md`
+- Approval required for new skills: No / Yes
+
+If this feature introduces a UI or user-facing flow, activate the relevant
+UX/product and frontend skills before implementation. If it does not, mark the
+UI/UX fields as `Not applicable` or `No` and do not activate those skills.
+
 ## Open questions
 
 - [ ] Question:
@@ -148,4 +166,3 @@ List accepted limitations and follow-up work.
 - Owner:
 - Last reviewed:
 - Related code:
-

@@ -14,6 +14,10 @@ Before substantial changes, read:
 3. `docs/architecture/overview.md`;
 4. the relevant feature specification;
 5. documentation for the affected module, if it exists.
+6. `docs/design/UX_PRODUCT_PLAYBOOK.md` for UI, UX, product-flow, content, or accessibility work.
+7. `docs/design/ux-core-catalog.md` when applying behavioral or cognitive-science patterns.
+8. `docs/design/ux-core-application-matrix.md` and `docs/design/ux-preflight-checklist.md` for UI planning or completion review.
+9. `docs/design/ux-core-pattern-cards.md` when selecting or explaining specific UX Core patterns.
 
 Use `docs/project/requirements.md` when validating product requirements and
 `docs/development/workflow.md` for the full delivery process.
@@ -123,3 +127,4 @@ Use:
 
 `docs/development/definition-of-done.md`
 
+For interface work, also verify the UX/Product Playbook checklist and report unresolved UX or accessibility risks.

@@ -8,8 +8,9 @@ not from which tools happen to be available.
 | Capability | Required | Preferred provider | Required operations | Notes |
 |---|---|---|---|---|
 | Code discovery | TBD | codebase-memory-mcp | Search, trace, snippets | May be omitted for empty or very small repositories |
-| Frontend design | TBD | design-taste-frontend | Direction, implementation review | Optional module |
-| Figma | TBD | Approved Figma tooling | Generate, read, design-to-code, components | Optional module |
+| Frontend design | no/TBD | design-taste-frontend | Direction, implementation review | Select only when a UI is required |
+| UX/product interface review | no/TBD | ux-product-playbook | UX architecture, accessibility, product-flow review | Select only when a UI or user-facing flow is required |
+| Figma | no/TBD | Approved Figma tooling | Generate, read, design-to-code, components | Select only when Figma/design work is required |
 | Unit testing | TBD | Project-native | Run and author tests | |
 | Integration testing | TBD | Project-native | Run and author tests | |
 | E2E testing | TBD | TBD | Browser/user flows | |
@@ -23,6 +24,9 @@ not from which tools happen to be available.
 | GitHub | TBD | TBD | TBD | TBD |
 
 ## Gap review
+
+Выполняйте этот review после сбора информации о проекте и до начала реализации.
+Результат поиска skills должен быть предложен пользователю на утверждение.
 
 For each missing capability:
 
@@ -41,4 +45,3 @@ For each missing capability:
 - Owner:
 - Last reviewed:
 - Related code: Repository-wide
-

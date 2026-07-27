@@ -3,9 +3,10 @@
 This file records actual reviewed skill state. Do not list a skill as installed
 or verified based only on a recommendation.
 
-| Capability | Skill | Source | Version/commit | Scope | Status | Verified on | Notes |
+| Capability | Skill | Source | Version/commit | Scope | Status | Activation | Verified on | Notes |
 |---|---|---|---|---|---|---|---|
-| TBD | TBD | TBD | TBD | project/global | required | — | |
+| UX/product interface review | ux-product-playbook | local Codex skill | local | global + project | verified | available | 2026-07-27 | Activate only when UI or user-facing flow is required |
+| Skill discovery | find-skills | local Codex skill | local | global + project | verified | active | 2026-07-27 | Used during initialization and feature re-review |
 
 Allowed statuses:
 
@@ -16,6 +17,13 @@ Allowed statuses:
 - `verified`
 - `rejected`
 - `unavailable`
+
+Activation values:
+
+- `active`
+- `available`
+- `not-required`
+- `proposed`
 
 ## Candidate review checklist
 
@@ -34,4 +42,3 @@ Allowed statuses:
 - Owner:
 - Last reviewed:
 - Related code: Environment tooling
-
