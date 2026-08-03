@@ -4,7 +4,7 @@ import { loadExtension, pathExists, readJson, resolveConfiguration } from "./con
 import { initializeProject } from "./initializer.mjs";
 import { applyProjectUpgrade, planProjectUpgrade, summarizeUpgradePlan } from "./upgrade.mjs";
 import { diagnoseProject } from "./doctor.mjs";
-import { planCompositionChange } from "./composition.mjs";
+import { planCompositionChange, planProfileMigration } from "./composition.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -24,6 +24,7 @@ Commands:
   update     Plan or apply a safe project upgrade
   add        Add a module or adapter with required dependencies
   remove     Remove an unreferenced module or adapter
+  switch-profile  Migrate the project to another profile
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -37,6 +38,7 @@ const COMMAND_HELP = {
   update: "Usage: basic-structure update [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
   add: "Usage: basic-structure add <module|adapter> <id> [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
   remove: "Usage: basic-structure remove <module|adapter> <id> [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
+  "switch-profile": "Usage: basic-structure switch-profile <id> [--project <directory>] [--plan|--apply] [--prune-incompatible] [--acknowledge-migration <qualified-id>] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -108,6 +110,14 @@ function parseComposition(argv) {
   return { ...options, kind, id };
 }
 
+function parseProfileMigration(argv) {
+  const id = argv.shift();
+  if (!id) throw new CliError("switch-profile requires <id>.");
+  const pruneIncompatible = argv.includes("--prune-incompatible");
+  const options = parseUpdate(argv.filter((argument) => argument !== "--prune-incompatible"));
+  return { ...options, id, pruneIncompatible };
+}
+
 async function listExtensions(starterRoot, kindFilter) {
   const result = [];
   for (const kind of ["profile", "module", "adapter"]) {
@@ -172,6 +182,22 @@ async function execute(command, argv, context) {
     ];
     return success(command, data, lines);
   }
+  if (command === "switch-profile") {
+    const options = parseProfileMigration(argv);
+    const plan = await planProfileMigration(starterRoot, path.resolve(cwd, options.project), options);
+    const data = { mode: options.apply ? "apply" : "plan", blocked: plan.blocked, profileMigration: plan.profileMigration, configChange: plan.configChange, fileSummary: summarizeUpgradePlan(plan), fileChanges: plan.changes, extensionChanges: plan.extensionChanges };
+    if (plan.blocked) throw new CliError("Profile migration is blocked by file conflicts or migration requirements.", "PROFILE_MIGRATION_BLOCKED", 2, data);
+    if (options.apply) data.result = await applyProjectUpgrade(plan);
+    const lines = [
+      `SWITCH ${plan.profileMigration.from} -> ${plan.profileMigration.to}`,
+      ...plan.profileMigration.automatic.map((identity) => `REQUIRED ${identity}`),
+      ...plan.profileMigration.pruned.map((identity) => `PRUNE ${identity}`),
+      ...plan.extensionChanges.filter((entry) => entry.status !== "unchanged").map((entry) => `${entry.status.toUpperCase()} ${entry.identity}`),
+      ...plan.changes.filter((entry) => entry.status !== "unchanged").map((entry) => `${entry.status.toUpperCase()} ${entry.path}`),
+      options.apply ? `Applied profile migration ${data.result.operationId}.` : "Plan only; no project files or configuration were changed."
+    ];
+    return success(command, data, lines);
+  }
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");
     const diagnosis = await diagnoseProject(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });
@@ -226,7 +252,7 @@ export async function runCli(options) {
     if (json) stdout.write(`${JSON.stringify(envelope)}\n`);
     else {
       if (error.data?.checks) for (const entry of error.data.checks) stderr.write(`${entry.status.toUpperCase().padEnd(4)} ${entry.id}: ${entry.message}\n`);
-      if (error.code === "UPGRADE_BLOCKED" || error.code === "COMPOSITION_BLOCKED") {
+      if (error.code === "UPGRADE_BLOCKED" || error.code === "COMPOSITION_BLOCKED" || error.code === "PROFILE_MIGRATION_BLOCKED") {
         for (const entry of error.data.extensionChanges.filter((change) => change.status !== "unchanged")) {
           stderr.write(`${entry.status.toUpperCase()} ${entry.identity} ${entry.fromVersion ?? "none"} -> ${entry.toVersion ?? "none"}${entry.acknowledged ? "" : " — acknowledgement required"}\n`);
           for (const notice of entry.notices) stderr.write(`  Migration: ${notice.description}\n`);

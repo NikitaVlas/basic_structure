@@ -55,6 +55,25 @@ remove rejects selected dependents. See
 [`composition changes`](composition-changes.md) for backup, conflict, and
 post-apply verification requirements.
 
+### Switch profile
+
+Always inspect the migration plan before apply:
+
+```text
+node bin/basic-structure.mjs switch-profile fullstack-web --project ../example-saas --plan
+node bin/basic-structure.mjs switch-profile fullstack-web --project ../example-saas --apply
+```
+
+The target profile replaces `surfaces` and adds its missing requirements. If
+selected extensions are incompatible, the command stops and lists them. Review
+the list before explicitly acknowledging their removal:
+
+```text
+node bin/basic-structure.mjs switch-profile documentation-only --project ../example-saas --plan --prune-incompatible
+```
+
+See [`profile migration`](profile-migration.md) for safety and recovery rules.
+
 ### Diagnose
 
 ```text

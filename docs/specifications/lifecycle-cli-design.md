@@ -17,6 +17,8 @@ testable library functions and exposes these commands:
 - `update`: plan or apply the existing safe upgrade engine;
 - `add`: add a module or adapter with recursive local requirements;
 - `remove`: remove an extension only when no selected dependent requires it;
+- `switch-profile`: migrate root ownership with explicit incompatible-extension
+  pruning acknowledgement;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.
@@ -71,8 +73,8 @@ required failures make the result unhealthy.
 1. Every command supports command-scoped help.
 2. Unknown commands and options fail consistently.
 3. JSON success, error, blocked, and unhealthy results follow one schema.
-4. `init`, `validate`, and `update` preserve existing behavior; `add` and
-   `remove` delegate to the composition change engine.
+4. `init`, `validate`, and `update` preserve existing behavior; `add`,
+   `remove`, and `switch-profile` delegate to transactional composition plans.
 5. `list` reports exact local extension versions and requirements.
 6. Doctor is read-only and distinguishes required, optional, and skipped checks.
 7. CLI functions are covered without spawning a shell.

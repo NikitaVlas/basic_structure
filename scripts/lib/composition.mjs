@@ -1,6 +1,8 @@
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { loadExtension, readJson, resolveConfiguration } from "./configuration.mjs";
 import { findUnfinishedUpgradeReports } from "./doctor.mjs";
+import { satisfiesSemver } from "./semver.mjs";
 import { planProjectUpgrade } from "./upgrade.mjs";
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
@@ -37,6 +39,63 @@ function assertSynchronized(plan) {
   }
 }
 
+async function assertCompositionReady(starterRoot, projectRoot) {
+  const unfinishedReports = await findUnfinishedUpgradeReports(projectRoot);
+  if (unfinishedReports.length) {
+    throw new CompositionError(
+      "Unfinished upgrade reports require review before changing composition.",
+      "UNFINISHED_UPGRADE",
+      2,
+      { reports: unfinishedReports }
+    );
+  }
+  assertSynchronized(await planProjectUpgrade(starterRoot, projectRoot));
+}
+
+async function collectProfileSlots(directory) {
+  const slots = new Set();
+  async function visit(current) {
+    for (const entry of await readdir(current, { withFileTypes: true })) {
+      const candidate = path.join(current, entry.name);
+      if (entry.isDirectory()) await visit(candidate);
+      else if (entry.isFile()) {
+        const content = await readFile(candidate, "utf8");
+        for (const match of content.matchAll(/\{\{SLOT:([A-Z][A-Z0-9_]*)\}\}/g)) slots.add(match[1]);
+      }
+    }
+  }
+  await visit(directory);
+  return slots;
+}
+
+function identityOf(extension) {
+  return `${extension.manifest.kind}:${extension.manifest.id}`;
+}
+
+function findIncompatibleExtensions(extensions, targetProfile, targetSlots) {
+  const targetIdentity = identityOf(targetProfile);
+  const selected = new Map([[targetIdentity, targetProfile.manifest.version], ...extensions.map((extension) => [identityOf(extension), extension.manifest.version])]);
+  const pruned = new Set();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const extension of extensions) {
+      const identity = identityOf(extension);
+      if (pruned.has(identity)) continue;
+      const missingSlot = Object.keys(extension.manifest.contributions ?? {}).some((slot) => !targetSlots.has(slot));
+      const invalidRequirement = Object.entries(extension.manifest.requires).some(([requirement, range]) => requirement.startsWith("profile:")
+        ? requirement !== targetIdentity || !satisfiesSemver(targetProfile.manifest.version, range)
+        : pruned.has(requirement) || !selected.has(requirement) || !satisfiesSemver(selected.get(requirement), range));
+      const conflict = extension.manifest.conflicts.includes(targetIdentity) || targetProfile.manifest.conflicts.includes(identity);
+      if (missingSlot || invalidRequirement || conflict) {
+        pruned.add(identity);
+        changed = true;
+      }
+    }
+  }
+  return [...pruned].sort();
+}
+
 async function addWithRequirements(starterRoot, proposed, identity, requestedIdentity, automatic, visiting = []) {
   const [kind, id] = identity.split(":");
   if (!new Set(["profile", "module", "adapter"]).has(kind) || !ID_PATTERN.test(id ?? "")) throw new CompositionError(`Invalid requirement identity: ${identity}.`);
@@ -61,17 +120,7 @@ export async function planCompositionChange(starterRoot, projectRoot, request) {
   if (!new Set(["add", "remove"]).has(action)) throw new CompositionError("Composition action must be add or remove.");
   assertKindAndId(kind, id);
   const resolvedProject = path.resolve(projectRoot);
-  const unfinishedReports = await findUnfinishedUpgradeReports(resolvedProject);
-  if (unfinishedReports.length) {
-    throw new CompositionError(
-      "Unfinished upgrade reports require review before changing composition.",
-      "UNFINISHED_UPGRADE",
-      2,
-      { reports: unfinishedReports }
-    );
-  }
-  const baseline = await planProjectUpgrade(starterRoot, resolvedProject);
-  assertSynchronized(baseline);
+  await assertCompositionReady(starterRoot, resolvedProject);
 
   const configPath = path.join(resolvedProject, "project.config.json");
   const currentConfig = await readJson(configPath);
@@ -104,5 +153,55 @@ export async function planCompositionChange(starterRoot, projectRoot, request) {
     before: { modules: currentConfig.modules, adapters: currentConfig.adapters },
     after: { modules: proposed.modules, adapters: proposed.adapters }
   };
+  return plan;
+}
+
+export async function planProfileMigration(starterRoot, projectRoot, request) {
+  const targetId = request.id;
+  if (!ID_PATTERN.test(targetId ?? "")) throw new CompositionError("Profile id must be a lowercase kebab-case identifier.");
+  const resolvedProject = path.resolve(projectRoot);
+  await assertCompositionReady(starterRoot, resolvedProject);
+
+  const currentConfig = await readJson(path.join(resolvedProject, "project.config.json"));
+  if (currentConfig.project.profile === targetId) throw new CompositionError(`profile:${targetId} is already selected.`);
+
+  const targetProfile = await loadExtension(starterRoot, "profile", targetId);
+  const current = await resolveConfiguration(starterRoot, currentConfig);
+  const proposed = structuredClone(currentConfig);
+  proposed.project.profile = targetId;
+  proposed.surfaces = [...targetProfile.manifest.surfaces];
+  const automatic = [];
+  for (const requirement of Object.keys(targetProfile.manifest.requires)) {
+    await addWithRequirements(starterRoot, proposed, requirement, `profile:${targetId}`, automatic);
+  }
+
+  const extensions = [...current.modules, ...current.adapters];
+  const targetSlots = await collectProfileSlots(path.join(targetProfile.root, targetProfile.manifest.files));
+  const incompatible = findIncompatibleExtensions(extensions, targetProfile, targetSlots);
+  if (incompatible.length && !request.pruneIncompatible) {
+    throw new CompositionError(
+      `Profile migration requires pruning incompatible extensions: ${incompatible.join(", ")}.`,
+      "PROFILE_PRUNE_REQUIRED",
+      2,
+      { from: `profile:${currentConfig.project.profile}`, to: `profile:${targetId}`, incompatible }
+    );
+  }
+  if (incompatible.length) {
+    const remove = new Set(incompatible);
+    proposed.modules = proposed.modules.filter((id) => !remove.has(`module:${id}`));
+    proposed.adapters = proposed.adapters.filter((id) => !remove.has(`adapter:${id}`));
+  }
+
+  await resolveConfiguration(starterRoot, proposed);
+  const plan = await planProjectUpgrade(starterRoot, resolvedProject, { config: proposed, acknowledgements: request.acknowledgements ?? [] });
+  plan.profileMigration = {
+    from: `profile:${currentConfig.project.profile}`,
+    to: `profile:${targetId}`,
+    automatic,
+    incompatible,
+    pruned: request.pruneIncompatible ? incompatible : [],
+    surfaces: { before: currentConfig.surfaces, after: proposed.surfaces }
+  };
+  plan.compositionChange = { action: "switch-profile", requested: `profile:${targetId}`, automatic, before: { profile: currentConfig.project.profile, modules: currentConfig.modules, adapters: currentConfig.adapters }, after: { profile: targetId, modules: proposed.modules, adapters: proposed.adapters } };
   return plan;
 }

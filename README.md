@@ -60,6 +60,15 @@ Available composition primitives are documented in
 Their supported version combinations are published in the
 [`extension compatibility matrix`](docs/development/extension-compatibility.md).
 
+Profiles can be migrated through an explicit plan-first workflow:
+
+```text
+node bin/basic-structure.mjs switch-profile fullstack-web --project ../example-saas --plan
+```
+
+See [`profile migration`](docs/development/profile-migration.md) before using
+`--apply` or acknowledging incompatible extension pruning.
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

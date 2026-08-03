@@ -236,6 +236,7 @@ function publicPlan(plan) {
     blocked: plan.blocked,
     configChange: plan.configChange,
     ...(plan.compositionChange ? { compositionChange: plan.compositionChange } : {}),
+    ...(plan.profileMigration ? { profileMigration: plan.profileMigration } : {}),
     changes: plan.changes,
     extensionChanges: plan.extensionChanges
   };

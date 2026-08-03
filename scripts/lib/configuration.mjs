@@ -72,6 +72,13 @@ export function validateExtensionManifest(manifest, expectedKind, expectedId) {
   for (const key of ["name", "description", "files"]) {
     if (typeof manifest[key] !== "string" || !manifest[key].trim()) errors.push(`${key} must be a non-empty string.`);
   }
+  if (expectedKind === "profile") {
+    if (manifest.surfaces !== undefined && (!Array.isArray(manifest.surfaces) || new Set(manifest.surfaces).size !== manifest.surfaces.length || manifest.surfaces.some((value) => typeof value !== "string" || !ID_PATTERN.test(value)))) {
+      errors.push("profile surfaces must be a unique array of lowercase kebab-case identifiers.");
+    }
+  } else if (manifest.surfaces !== undefined) {
+    errors.push("surfaces is supported only by profiles.");
+  }
   try { parseSemver(manifest.version); } catch { errors.push("version must be a strict MAJOR.MINOR.PATCH semantic version."); }
   try { parseSemverRange(manifest.starter); } catch { errors.push("starter must be a supported semantic version range."); }
   if (!manifest.requires || typeof manifest.requires !== "object" || Array.isArray(manifest.requires)) {
@@ -118,6 +125,7 @@ export async function loadExtension(root, kind, id) {
   const manifestPath = path.join(extensionRoot, manifestName);
   if (!(await pathExists(manifestPath))) throw new Error(`Unknown ${kind} '${id}': ${manifestPath} does not exist.`);
   const manifest = await readJson(manifestPath);
+  if (kind === "profile" && manifest.surfaces === undefined) manifest.surfaces = [];
   const errors = validateExtensionManifest(manifest, kind, id);
   if (errors.length) throw new Error(`Invalid ${kind} '${id}':\n- ${errors.join("\n- ")}`);
   if (!(await pathExists(path.join(extensionRoot, manifest.files)))) {

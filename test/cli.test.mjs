@@ -37,6 +37,29 @@ test("CLI root and command help are stable", async () => {
   assert.equal(envelope.ok, true);
   assert.equal(envelope.data.topic, "update");
   assert.match(envelope.data.text, /--acknowledge-migration/);
+  result = await invoke(["help", "switch-profile"]);
+  assert.match(result.stdout, /--prune-incompatible/);
+});
+
+test("CLI switch-profile exposes plan and apply evidence", async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "basic-structure-cli-profile-"));
+  try {
+    const output = await initializeFixture(temporaryRoot);
+    let result = await invoke(["switch-profile", "fullstack-web", "--project", output, "--plan", "--json"]);
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    let envelope = JSON.parse(result.stdout);
+    assert.equal(envelope.data.profileMigration.from, "profile:documentation-only");
+    assert.equal(envelope.data.profileMigration.to, "profile:fullstack-web");
+    assert.deepEqual(envelope.data.profileMigration.automatic, ["module:shared-contracts"]);
+
+    result = await invoke(["switch-profile", "fullstack-web", "--project", output, "--apply", "--json"]);
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    envelope = JSON.parse(result.stdout);
+    assert.ok(envelope.data.result.operationId);
+    assert.equal(JSON.parse(await readFile(path.join(output, "project.config.json"), "utf8")).project.profile, "fullstack-web");
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
 });
 
 test("CLI JSON validate and list commands expose versioned data", async () => {

@@ -71,7 +71,8 @@ delta, extension delta, and file evidence.
 
 ## Non-goals
 
-- Profile replacement.
+- Profile replacement, which is specified separately in
+  `docs/specifications/profile-migration-design.md`.
 - Automatic cascading removal.
 - Installing package dependencies or regenerating lockfiles.
 - Remote extension discovery.
