@@ -108,7 +108,7 @@ test("CLI preset commands initialize diff and apply recipes", async () => {
   try {
     let result = await invoke(["list-presets", "--json"]);
     assert.equal(result.exitCode, 0);
-    assert.equal(JSON.parse(result.stdout).data.presets.length, 9);
+    assert.equal(JSON.parse(result.stdout).data.presets.length, 11);
 
     result = await invoke(["init", "--preset", "documentation", "--name", "cli-preset", "--output", output, "--json"]);
     assert.equal(result.exitCode, 0, result.stderr || result.stdout);
@@ -331,5 +331,5 @@ test("package bin entry point executes without a shell", () => {
   const result = spawnSync(process.execPath, [path.join(root, "bin", "basic-structure.mjs"), "list", "--kind", "profile", "--json"], { cwd: root, encoding: "utf8", windowsHide: true });
   assert.equal(result.status, 0, result.stderr);
   const envelope = JSON.parse(result.stdout);
-  assert.equal(envelope.data.extensions.length, 5);
+  assert.equal(envelope.data.extensions.length, 7);
 });
