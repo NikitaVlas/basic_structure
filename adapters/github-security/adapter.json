@@ -1,0 +1,16 @@
+{
+  "$schema": "../../schemas/extension-manifest.schema.json",
+  "schemaVersion": 1,
+  "kind": "adapter",
+  "id": "github-security",
+  "name": "GitHub security gates",
+  "description": "CodeQL, dependency review, repository secret scanning, container vulnerability scanning, SBOM artifacts, Dependabot, and local posture verification.",
+  "files": "template",
+  "requires": ["adapter:github-ci", "adapter:docker-production"],
+  "conflicts": [],
+  "packageDependencies": {
+    "package.json": {
+      "scripts": { "security:posture": "node scripts/security-posture.mjs" }
+    }
+  }
+}

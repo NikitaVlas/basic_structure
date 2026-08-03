@@ -1,0 +1,16 @@
+name: Dependency review
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: never
+          license-check: true
+          deny-licenses: AGPL-1.0-only, AGPL-1.0-or-later, SSPL-1.0

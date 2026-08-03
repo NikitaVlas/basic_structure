@@ -48,6 +48,8 @@ Current adapters:
 - `github-ci` — GitHub Actions verification workflow.
 - `docker-production` — hardened production images, private service composition,
   migration gates, proxy security headers, and deployment smoke checks.
+- `github-security` — CodeQL, dependency review, secret and container scanning,
+  SBOM artifacts, Dependabot, and local production posture gates.
 
 ## Manifest contract
 

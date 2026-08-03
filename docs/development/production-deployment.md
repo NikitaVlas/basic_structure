@@ -77,6 +77,11 @@ suite remains green, and rollback/residual risks are documented. The generated
 `production-images.yml` applies the same gates in CI without publishing images.
 Publishing or deploying remains an explicit user-authorized action.
 
+The `github-security` adapter adds `npm run security:posture`, CodeQL,
+dependency review, repository secret scanning, production image scanning, and
+CycloneDX SBOM artifacts. Follow `docs/security/vulnerability-response.md` for
+any finding; scanner suppression is not an acceptable substitute for triage.
+
 ## Document status
 
 - Status: Active

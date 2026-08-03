@@ -27,9 +27,10 @@ test("full-stack example bootstraps a coherent repository", async () => {
     assert.match(workflow, /npm run verify/);
 
     const state = JSON.parse(await readFile(path.join(output, ".basic-structure", "state.json"), "utf8"));
-    assert.deepEqual(state.adapters, ["github-ci", "docker-production"]);
+    assert.deepEqual(state.adapters, ["github-ci", "docker-production", "github-security"]);
     assert.ok(state.generatedFiles.some((file) => file.owner === "adapter:github-ci"));
     assert.ok(state.generatedFiles.some((file) => file.owner === "adapter:docker-production"));
+    assert.ok(state.generatedFiles.some((file) => file.owner === "adapter:github-security"));
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

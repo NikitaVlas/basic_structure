@@ -53,6 +53,11 @@ health checks, and CI smoke validation. It is governed by the
 [`AI engineering harness`](docs/architecture/ai-engineering-harness.md) and
 documented in
 [`production deployment`](docs/development/production-deployment.md).
+
+The optional `github-security` adapter enforces repository and image security
+gates while the harness supplies the reusable
+[`threat model`](docs/security/threat-model.md) and
+[`vulnerability response`](docs/security/vulnerability-response.md).
 - `schemas/project-config.schema.json` is the versioned configuration contract.
 
 Copy an example to `project.config.json`, record real product decisions, and

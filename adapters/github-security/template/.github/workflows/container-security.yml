@@ -1,0 +1,64 @@
+name: Container security
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 4 * * 3"
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run security:posture
+      - name: Build production images
+        run: |
+          docker build -f Dockerfile.api-worker -t local/app:${{ github.sha }} .
+          docker build -f Dockerfile.webapp -t local/web:${{ github.sha }} .
+      - name: Scan API and worker image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.70.0
+          image-ref: local/app:${{ github.sha }}
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Scan web image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.70.0
+          image-ref: local/web:${{ github.sha }}
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Generate application SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.70.0
+          image-ref: local/app:${{ github.sha }}
+          format: cyclonedx
+          output: app-sbom.cdx.json
+          exit-code: "0"
+      - name: Generate web SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.70.0
+          image-ref: local/web:${{ github.sha }}
+          format: cyclonedx
+          output: web-sbom.cdx.json
+          exit-code: "0"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyclonedx-sboms
+          path: "*-sbom.cdx.json"
+          retention-days: 30
