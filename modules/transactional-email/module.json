@@ -1,12 +1,14 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "module",
   "id": "transactional-email",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "Transactional email",
   "description": "Typed verification and password-reset email templates with safe console and SMTP transports.",
   "files": "template",
-  "requires": ["module:observability", "module:database-postgres"],
+  "requires": { "module:observability": "^1.0.0", "module:database-postgres": "^1.0.0" },
   "conflicts": [],
   "contributions": {
     "API_ENV": "contributions/api-env.txt"

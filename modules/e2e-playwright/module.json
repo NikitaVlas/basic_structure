@@ -1,12 +1,14 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "module",
   "id": "e2e-playwright",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "Playwright browser E2E",
   "description": "Isolated browser journeys across PostgreSQL, Valkey, Mailpit, API, email worker, and React webapp.",
   "files": "template",
-  "requires": ["profile:fullstack-web", "module:database-postgres", "module:transactional-email", "module:rate-limit-valkey", "module:auth-session"],
+  "requires": { "profile:fullstack-web": "^1.0.0", "module:database-postgres": "^1.0.0", "module:transactional-email": "^1.0.0", "module:rate-limit-valkey": "^1.0.0", "module:auth-session": "^1.0.0" },
   "conflicts": [],
   "packageDependencies": {
     "package.json": {

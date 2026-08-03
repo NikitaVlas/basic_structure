@@ -1,11 +1,13 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "adapter",
   "id": "github-ci",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "GitHub Actions verification",
   "description": "Runs installation and the generated project's unified verification command on pushes and pull requests.",
   "files": "template",
-  "requires": [],
+  "requires": {},
   "conflicts": []
 }

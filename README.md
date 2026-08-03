@@ -40,11 +40,13 @@ replaced or retired files, and records an operation report. See
 [`project upgrades`](docs/development/project-upgrades.md).
 
 The initializer never overwrites a non-empty output directory. Generated files,
-their owning extensions, and SHA-256 baselines are recorded in
+their owning extensions, exact extension versions, and SHA-256 baselines are recorded in
 `.basic-structure/state.json`.
 
 Available composition primitives are documented in
 [`docs/development/extensions.md`](docs/development/extensions.md).
+Their supported version combinations are published in the
+[`extension compatibility matrix`](docs/development/extension-compatibility.md).
 
 ### Configuration
 

@@ -8,8 +8,8 @@ core, profile, module, or adapter files from the starter.
 
 ## Decision
 
-Generated state schema version 2 records a SHA-256 baseline for every owned
-file after rendering, contributions, and package dependency composition. The
+Generated state schema version 3 records a SHA-256 baseline for every owned
+file plus exact extension versions after rendering, contributions, and package dependency composition. The
 upgrade engine renders the selected configuration into an isolated temporary
 directory and compares three values:
 
@@ -51,7 +51,7 @@ result. Backup restoration remains an explicit operator action.
 
 ## Acceptance criteria
 
-1. New projects contain state schema version 2 and SHA-256 hashes.
+1. New projects contain state schema version 3, extension versions, and SHA-256 hashes.
 2. Planning never modifies the target project.
 3. Unmodified owned files update automatically.
 4. User-only edits are preserved.

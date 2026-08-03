@@ -160,7 +160,6 @@ export async function initializeProject(starterRoot, outputRoot, config, options
   const stateRoot = path.join(plan.outputRoot, ".basic-structure");
   await mkdir(stateRoot, { recursive: true });
   await writeFile(path.join(plan.outputRoot, "project.config.json"), `${JSON.stringify(config, null, 2)}\n`, "utf8");
-  const starterPackage = JSON.parse(await readFile(path.join(starterRoot, "package.json"), "utf8"));
   const generatedFiles = await Promise.all(plan.files.map(async ({ relative, owner }) => ({
     path: relative,
     owner,
@@ -168,12 +167,13 @@ export async function initializeProject(starterRoot, outputRoot, config, options
     hash: await hashFile(path.join(plan.outputRoot, relative), relative)
   })));
   await writeFile(path.join(stateRoot, "state.json"), `${JSON.stringify({
-    schemaVersion: 2,
-    starterVersion: starterPackage.version,
+    schemaVersion: 3,
+    starterVersion: plan.resolved.starterVersion,
     generatedAt: new Date().toISOString(),
     profile: config.project.profile,
     modules: config.modules,
     adapters: config.adapters,
+    extensionVersions: plan.resolved.extensionVersions,
     generatedFiles
   }, null, 2)}\n`, "utf8");
   return plan;

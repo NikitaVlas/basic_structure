@@ -4,15 +4,20 @@
   "title": "Basic Structure generated project state",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "starterVersion", "generatedAt", "profile", "modules", "adapters", "generatedFiles"],
+  "required": ["schemaVersion", "starterVersion", "generatedAt", "profile", "modules", "adapters", "extensionVersions", "generatedFiles"],
   "properties": {
-    "schemaVersion": { "const": 2 },
+    "schemaVersion": { "const": 3 },
     "starterVersion": { "type": "string", "minLength": 1 },
     "generatedAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" },
     "profile": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
     "modules": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "uniqueItems": true },
     "adapters": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "uniqueItems": true },
+    "extensionVersions": {
+      "type": "object",
+      "propertyNames": { "pattern": "^(profile|module|adapter):[a-z][a-z0-9-]*$" },
+      "additionalProperties": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" }
+    },
     "generatedFiles": {
       "type": "array",
       "items": {
@@ -29,4 +34,3 @@
     }
   }
 }
-

@@ -1,11 +1,13 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "module",
   "id": "shared-contracts",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "Shared API contracts",
   "description": "Framework-independent TypeScript contracts shared by application surfaces.",
   "files": "template",
-  "requires": [],
+  "requires": {},
   "conflicts": []
 }

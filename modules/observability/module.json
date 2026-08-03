@@ -1,12 +1,14 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "module",
   "id": "observability",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "Structured observability foundation",
   "description": "Vendor-neutral structured logs, recursive redaction, correlation, safe error reporting, and Prometheus metrics.",
   "files": "template",
-  "requires": [],
+  "requires": {},
   "conflicts": [],
   "contributions": {
     "API_IMPORTS": "contributions/api-imports.txt",

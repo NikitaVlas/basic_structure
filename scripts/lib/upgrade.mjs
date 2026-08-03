@@ -5,6 +5,7 @@ import path from "node:path";
 import { initializeProject } from "./initializer.mjs";
 import { pathExists, readJson } from "./configuration.mjs";
 import { hashGeneratedContent } from "./content-hash.mjs";
+import { compareSemver, parseSemver, satisfiesSemver } from "./semver.mjs";
 
 const BLOCKING_STATUSES = new Set(["conflict", "legacy-conflict"]);
 
@@ -20,7 +21,13 @@ function validateManagedPath(value) {
 }
 
 function validateState(state) {
-  if (![1, 2].includes(state?.schemaVersion)) throw new Error(`Unsupported generated state schema: ${state?.schemaVersion}.`);
+  if (![1, 2, 3].includes(state?.schemaVersion)) throw new Error(`Unsupported generated state schema: ${state?.schemaVersion}.`);
+  if (typeof state.profile !== "string" || !/^[a-z][a-z0-9-]*$/.test(state.profile)) throw new Error("Generated state contains an invalid profile id.");
+  for (const key of ["modules", "adapters"]) {
+    if (!Array.isArray(state[key]) || new Set(state[key]).size !== state[key].length || state[key].some((id) => !/^[a-z][a-z0-9-]*$/.test(id))) {
+      throw new Error(`Generated state contains invalid ${key}.`);
+    }
+  }
   if (!Array.isArray(state.generatedFiles)) throw new Error("Generated state must contain generatedFiles.");
   const seen = new Set();
   for (const entry of state.generatedFiles) {
@@ -28,8 +35,22 @@ function validateState(state) {
     if (typeof entry.owner !== "string" || !entry.owner) throw new Error(`Invalid owner for '${entry.path}'.`);
     if (seen.has(entry.path)) throw new Error(`Duplicate managed path in state: ${entry.path}.`);
     seen.add(entry.path);
-    if (state.schemaVersion === 2 && (entry.hashAlgorithm !== "sha256" || !/^[a-f0-9]{64}$/.test(entry.hash ?? ""))) {
+    if (state.schemaVersion >= 2 && (entry.hashAlgorithm !== "sha256" || !/^[a-f0-9]{64}$/.test(entry.hash ?? ""))) {
       throw new Error(`Invalid SHA-256 baseline for '${entry.path}'.`);
+    }
+  }
+  if (state.schemaVersion === 3) {
+    if (!state.extensionVersions || typeof state.extensionVersions !== "object" || Array.isArray(state.extensionVersions)) {
+      throw new Error("State schema 3 must contain extensionVersions.");
+    }
+    for (const [identity, version] of Object.entries(state.extensionVersions)) {
+      if (!/^(profile|module|adapter):[a-z][a-z0-9-]*$/.test(identity)) throw new Error(`Invalid extension identity in state: ${identity}.`);
+      try { parseSemver(version); } catch { throw new Error(`Invalid extension version in state for ${identity}.`); }
+    }
+    const expected = new Set([`profile:${state.profile}`, ...state.modules.map((id) => `module:${id}`), ...state.adapters.map((id) => `adapter:${id}`)]);
+    const recorded = new Set(Object.keys(state.extensionVersions));
+    if (expected.size !== recorded.size || [...expected].some((identity) => !recorded.has(identity))) {
+      throw new Error("State extensionVersions must exactly match the selected profile, modules, and adapters.");
     }
   }
 }
@@ -68,20 +89,54 @@ async function renderDesired(starterRoot, config) {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "basic-structure-upgrade-"));
   const outputRoot = path.join(temporaryRoot, "desired");
   try {
-    await initializeProject(starterRoot, outputRoot, config);
+    const initialization = await initializeProject(starterRoot, outputRoot, config);
     const state = await readJson(path.join(outputRoot, ".basic-structure", "state.json"));
     const files = new Map();
     for (const entry of state.generatedFiles) {
       validateManagedPath(entry.path);
       files.set(entry.path, await readFile(path.join(outputRoot, ...entry.path.split("/"))));
     }
-    return { state, files };
+    const extensionMigrations = Object.fromEntries(
+      [initialization.resolved.profile, ...initialization.resolved.modules, ...initialization.resolved.adapters]
+        .map(({ manifest }) => [`${manifest.kind}:${manifest.id}`, manifest.migrations ?? []])
+    );
+    return { state, files, extensionMigrations };
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
 }
 
-export async function planProjectUpgrade(starterRoot, projectRoot) {
+function classifyExtensionChanges(previousState, desired, acknowledgements) {
+  const previousVersions = previousState.extensionVersions ?? {};
+  const desiredVersions = desired.state.extensionVersions;
+  const identities = [...new Set([...Object.keys(previousVersions), ...Object.keys(desiredVersions)])].sort();
+  const accepted = new Set(acknowledgements);
+  return identities.map((identity) => {
+    const fromVersion = previousVersions[identity] ?? null;
+    const toVersion = desiredVersions[identity] ?? null;
+    if (!fromVersion) return { identity, fromVersion, toVersion, status: "baseline-adoption", acknowledged: true, notices: [], reason: "Previous state did not record this extension version." };
+    if (!toVersion) return { identity, fromVersion, toVersion, status: "removed", acknowledged: true, notices: [], reason: "Extension is no longer selected." };
+    const comparison = compareSemver(toVersion, fromVersion);
+    if (comparison === 0) return { identity, fromVersion, toVersion, status: "unchanged", acknowledged: true, notices: [], reason: "Extension version is unchanged." };
+    if (comparison < 0) return { identity, fromVersion, toVersion, status: "downgrade-blocked", acknowledged: false, notices: [], reason: "Extension downgrades require an explicit reverse-migration design." };
+
+    const notices = (desired.extensionMigrations[identity] ?? []).filter((migration) => migration.to === toVersion && satisfiesSemver(fromVersion, migration.from));
+    const majorChanged = parseSemver(fromVersion).major !== parseSemver(toVersion).major;
+    const required = majorChanged || notices.some((notice) => notice.required);
+    const acknowledged = !required || accepted.has(identity);
+    return {
+      identity,
+      fromVersion,
+      toVersion,
+      status: required ? "migration-required" : "compatible",
+      acknowledged,
+      notices: notices.map(({ from, to, required: noticeRequired, description }) => ({ from, to, required: noticeRequired, description })),
+      reason: required ? "Breaking extension upgrade requires explicit acknowledgement." : "Forward-compatible extension upgrade."
+    };
+  });
+}
+
+export async function planProjectUpgrade(starterRoot, projectRoot, options = {}) {
   const resolvedProject = await realpath(path.resolve(projectRoot));
   const statePath = path.join(resolvedProject, ".basic-structure", "state.json");
   const configPath = path.join(resolvedProject, "project.config.json");
@@ -94,6 +149,7 @@ export async function planProjectUpgrade(starterRoot, projectRoot) {
   validateState(previousState);
   const desired = await renderDesired(starterRoot, config);
   validateState(desired.state);
+  const extensionChanges = classifyExtensionChanges(previousState, desired, options.acknowledgements ?? []);
 
   const previousByPath = new Map(previousState.generatedFiles.map((entry) => [entry.path, entry]));
   const desiredByPath = new Map(desired.state.generatedFiles.map((entry) => [entry.path, entry]));
@@ -150,8 +206,9 @@ export async function planProjectUpgrade(starterRoot, projectRoot) {
     projectRoot: resolvedProject,
     previousSchemaVersion: previousState.schemaVersion,
     targetSchemaVersion: desired.state.schemaVersion,
-    blocked: changes.some((change) => BLOCKING_STATUSES.has(change.status)),
+    blocked: changes.some((change) => BLOCKING_STATUSES.has(change.status)) || extensionChanges.some((change) => change.status === "downgrade-blocked" || !change.acknowledged),
     changes,
+    extensionChanges,
     desiredState: desired.state,
     desiredFiles: desired.files,
     previousStateContent: await readFile(statePath)
@@ -164,7 +221,8 @@ function publicPlan(plan) {
     previousSchemaVersion: plan.previousSchemaVersion,
     targetSchemaVersion: plan.targetSchemaVersion,
     blocked: plan.blocked,
-    changes: plan.changes
+    changes: plan.changes,
+    extensionChanges: plan.extensionChanges
   };
 }
 

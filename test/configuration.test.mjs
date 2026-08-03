@@ -35,8 +35,21 @@ test("configuration rejects invalid project names", () => {
 
 test("extension manifests reject unsafe contribution slot names", () => {
   const errors = validateExtensionManifest({
-    schemaVersion: 1, kind: "module", id: "sample", name: "Sample", description: "Sample module", files: "template",
-    requires: [], conflicts: [], contributions: { "../../escape": "fragment.txt" }
+    schemaVersion: 2, kind: "module", id: "sample", version: "1.0.0", starter: "^0.1.0", name: "Sample", description: "Sample module", files: "template",
+    requires: {}, conflicts: [], contributions: { "../../escape": "fragment.txt" }
   }, "module", "sample");
   assert.ok(errors.some((error) => error.includes("invalid contribution slot")));
+});
+
+test("extension manifests reject invalid version and migration metadata", () => {
+  const errors = validateExtensionManifest({
+    schemaVersion: 2, kind: "module", id: "sample", version: "v1", starter: "*", name: "Sample", description: "Sample module", files: "template",
+    requires: { "bad identity": "latest" }, conflicts: [],
+    migrations: [{ from: "*", to: "2.0.0", required: "yes", description: "" }]
+  }, "module", "sample");
+  assert.ok(errors.some((error) => error.startsWith("version must")));
+  assert.ok(errors.some((error) => error.startsWith("starter must")));
+  assert.ok(errors.some((error) => error.includes("invalid requirement id")));
+  assert.ok(errors.some((error) => error.includes("migration.to must equal")));
+  assert.ok(errors.some((error) => error.includes("migration.required")));
 });

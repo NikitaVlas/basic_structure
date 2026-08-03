@@ -4,17 +4,37 @@
   "title": "Basic Structure extension manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "kind", "id", "name", "description", "files", "requires", "conflicts"],
+  "required": ["schemaVersion", "kind", "id", "version", "starter", "name", "description", "files", "requires", "conflicts"],
   "properties": {
     "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "kind": { "enum": ["profile", "module", "adapter"] },
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "starter": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
     "description": { "type": "string", "minLength": 1 },
     "files": { "type": "string", "minLength": 1 },
-    "requires": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
-    "conflicts": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "requires": {
+      "type": "object",
+      "propertyNames": { "pattern": "^(profile|module|adapter):[a-z][a-z0-9-]*$" },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "conflicts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^(profile|module|adapter):[a-z][a-z0-9-]*$" } },
+    "migrations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "required", "description"],
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "required": { "type": "boolean" },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "contributions": {
       "type": "object",
       "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },

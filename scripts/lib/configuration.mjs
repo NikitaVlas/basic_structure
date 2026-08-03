@@ -1,9 +1,11 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
+import { parseSemver, parseSemverRange, satisfiesSemver } from "./semver.mjs";
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 const PROJECT_NAME_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
 const EXTENSION_KINDS = ["profile", "module", "adapter"];
+const QUALIFIED_EXTENSION_PATTERN = /^(profile|module|adapter):[a-z][a-z0-9-]*$/;
 
 export async function pathExists(candidate) {
   try {
@@ -62,7 +64,7 @@ export function validateProjectConfig(config) {
 
 export function validateExtensionManifest(manifest, expectedKind, expectedId) {
   const errors = [];
-  if (manifest.schemaVersion !== 1) errors.push("schemaVersion must be 1.");
+  if (manifest.schemaVersion !== 2) errors.push("schemaVersion must be 2.");
   if (!EXTENSION_KINDS.includes(manifest.kind)) errors.push("kind must be profile, module, or adapter.");
   if (manifest.kind !== expectedKind) errors.push(`kind must be ${expectedKind}.`);
   if (manifest.id !== expectedId) errors.push(`id must match directory name ${expectedId}.`);
@@ -70,9 +72,27 @@ export function validateExtensionManifest(manifest, expectedKind, expectedId) {
   for (const key of ["name", "description", "files"]) {
     if (typeof manifest[key] !== "string" || !manifest[key].trim()) errors.push(`${key} must be a non-empty string.`);
   }
-  for (const key of ["requires", "conflicts"]) {
-    if (!Array.isArray(manifest[key]) || manifest[key].some((value) => typeof value !== "string")) {
-      errors.push(`${key} must be an array of strings.`);
+  try { parseSemver(manifest.version); } catch { errors.push("version must be a strict MAJOR.MINOR.PATCH semantic version."); }
+  try { parseSemverRange(manifest.starter); } catch { errors.push("starter must be a supported semantic version range."); }
+  if (!manifest.requires || typeof manifest.requires !== "object" || Array.isArray(manifest.requires)) {
+    errors.push("requires must be an object of qualified extension ids and version ranges.");
+  } else {
+    for (const [requirement, range] of Object.entries(manifest.requires)) {
+      if (!QUALIFIED_EXTENSION_PATTERN.test(requirement)) errors.push(`invalid requirement id: ${requirement}.`);
+      try { parseSemverRange(range); } catch { errors.push(`invalid requirement range for ${requirement}.`); }
+    }
+  }
+  if (!Array.isArray(manifest.conflicts) || manifest.conflicts.some((value) => !QUALIFIED_EXTENSION_PATTERN.test(value))) {
+    errors.push("conflicts must be an array of qualified extension ids.");
+  }
+  if (manifest.migrations !== undefined) {
+    if (!Array.isArray(manifest.migrations)) errors.push("migrations must be an array.");
+    else for (const migration of manifest.migrations) {
+      try { parseSemverRange(migration?.from); } catch { errors.push("migration.from must be a supported semantic version range."); }
+      try { parseSemver(migration?.to); } catch { errors.push("migration.to must be a strict semantic version."); }
+      if (migration?.to !== manifest.version) errors.push("migration.to must equal the manifest version.");
+      if (typeof migration?.required !== "boolean") errors.push("migration.required must be a boolean.");
+      if (typeof migration?.description !== "string" || !migration.description.trim() || /[\u0000-\u001f\u007f]/.test(migration.description)) errors.push("migration.description must be non-empty single-line text without control characters.");
     }
   }
   if (manifest.contributions !== undefined) {
@@ -111,6 +131,21 @@ export async function loadExtension(root, kind, id) {
   return { manifest, root: extensionRoot };
 }
 
+function assertAcyclicRequirements(extensions) {
+  const graph = new Map(extensions.map(({ manifest }) => [`${manifest.kind}:${manifest.id}`, Object.keys(manifest.requires)]));
+  const visiting = new Set();
+  const visited = new Set();
+  function visit(identity, trail) {
+    if (visiting.has(identity)) throw new Error(`Extension requirement cycle: ${[...trail, identity].join(" -> ")}.`);
+    if (visited.has(identity)) return;
+    visiting.add(identity);
+    for (const requirement of graph.get(identity) ?? []) visit(requirement, [...trail, identity]);
+    visiting.delete(identity);
+    visited.add(identity);
+  }
+  for (const identity of graph.keys()) visit(identity, []);
+}
+
 export async function resolveConfiguration(root, config) {
   const configErrors = validateProjectConfig(config);
   if (configErrors.length) throw new Error(`Invalid project configuration:\n- ${configErrors.join("\n- ")}`);
@@ -118,19 +153,26 @@ export async function resolveConfiguration(root, config) {
   const profile = await loadExtension(root, "profile", config.project.profile);
   const modules = await Promise.all(config.modules.map((id) => loadExtension(root, "module", id)));
   const adapters = await Promise.all(config.adapters.map((id) => loadExtension(root, "adapter", id)));
-  const selected = new Set([
-    `profile:${profile.manifest.id}`,
-    ...modules.map(({ manifest }) => `module:${manifest.id}`),
-    ...adapters.map(({ manifest }) => `adapter:${manifest.id}`)
-  ]);
+  const starterPackage = await readJson(path.join(root, "package.json"));
+  parseSemver(starterPackage.version);
+  const extensions = [profile, ...modules, ...adapters];
+  const selected = new Map(extensions.map(({ manifest }) => [`${manifest.kind}:${manifest.id}`, manifest.version]));
 
-  for (const extension of [profile, ...modules, ...adapters]) {
-    for (const requirement of extension.manifest.requires) {
-      if (!selected.has(requirement)) throw new Error(`${extension.manifest.kind}:${extension.manifest.id} requires ${requirement}.`);
+  for (const extension of extensions) {
+    const identity = `${extension.manifest.kind}:${extension.manifest.id}`;
+    if (!satisfiesSemver(starterPackage.version, extension.manifest.starter)) {
+      throw new Error(`${identity}@${extension.manifest.version} does not support starter ${starterPackage.version}; expected ${extension.manifest.starter}.`);
+    }
+    for (const [requirement, range] of Object.entries(extension.manifest.requires)) {
+      if (!selected.has(requirement)) throw new Error(`${identity} requires ${requirement}@${range}.`);
+      if (!satisfiesSemver(selected.get(requirement), range)) {
+        throw new Error(`${identity} requires ${requirement}@${range}, selected ${selected.get(requirement)}.`);
+      }
     }
     for (const conflict of extension.manifest.conflicts) {
-      if (selected.has(conflict)) throw new Error(`${extension.manifest.kind}:${extension.manifest.id} conflicts with ${conflict}.`);
+      if (selected.has(conflict)) throw new Error(`${identity} conflicts with ${conflict}.`);
     }
   }
-  return { profile, modules, adapters };
+  assertAcyclicRequirements(extensions);
+  return { profile, modules, adapters, starterVersion: starterPackage.version, extensionVersions: Object.fromEntries(selected) };
 }

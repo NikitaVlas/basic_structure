@@ -30,15 +30,24 @@ async function createStarter(root) {
   await put(root, "scripts/lib/documentation.mjs", "export {};\n");
   await put(root, "profiles/documentation-only/template/retire.txt", "retire-v1\n");
   await put(root, "profiles/documentation-only/profile.json", `${JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: "profile",
     id: "documentation-only",
+    version: "1.0.0",
+    starter: ">=1.0.0 <2.0.0",
     name: "Documentation only",
     description: "Fixture profile",
     files: "template",
-    requires: [],
+    requires: {},
     conflicts: []
   }, null, 2)}\n`);
+}
+
+async function updateFixtureManifest(starter, update) {
+  const manifestPath = path.join(starter, "profiles", "documentation-only", "profile.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  update(manifest);
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
 async function withFixture(run) {
@@ -54,11 +63,12 @@ async function withFixture(run) {
   }
 }
 
-test("initializer records state v2 SHA-256 baselines", async () => {
+test("initializer records state v3 versions and SHA-256 baselines", async () => {
   await withFixture(async ({ project }) => {
     const state = JSON.parse(await readFile(path.join(project, ".basic-structure", "state.json"), "utf8"));
-    assert.equal(state.schemaVersion, 2);
+    assert.equal(state.schemaVersion, 3);
     assert.equal(state.starterVersion, "1.0.0");
+    assert.equal(state.extensionVersions["profile:documentation-only"], "1.0.0");
     assert.ok(state.generatedFiles.every((entry) => entry.hashAlgorithm === "sha256" && /^[a-f0-9]{64}$/.test(entry.hash)));
   });
 });
@@ -68,6 +78,30 @@ test("text baselines are stable across LF and CRLF checkouts", async () => {
     await writeFile(path.join(project, "AGENTS.md"), "agents-v1\r\n", "utf8");
     const plan = await planProjectUpgrade(starter, project);
     assert.equal(plan.changes.find((entry) => entry.path === "AGENTS.md").status, "unchanged");
+  });
+});
+
+test("state v2 adopts extension version baselines without weakening file checks", async () => {
+  await withFixture(async ({ starter, project }) => {
+    const statePath = path.join(project, ".basic-structure", "state.json");
+    const state = JSON.parse(await readFile(statePath, "utf8"));
+    state.schemaVersion = 2;
+    delete state.extensionVersions;
+    await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    const plan = await planProjectUpgrade(starter, project);
+    assert.equal(plan.blocked, false);
+    assert.equal(plan.extensionChanges[0].status, "baseline-adoption");
+    assert.ok(plan.changes.every((entry) => entry.status === "unchanged"));
+  });
+});
+
+test("state v3 rejects extension version sets that do not match composition", async () => {
+  await withFixture(async ({ starter, project }) => {
+    const statePath = path.join(project, ".basic-structure", "state.json");
+    const state = JSON.parse(await readFile(statePath, "utf8"));
+    delete state.extensionVersions["profile:documentation-only"];
+    await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    await assert.rejects(() => planProjectUpgrade(starter, project), /must exactly match/);
   });
 });
 
@@ -109,6 +143,94 @@ test("apply is blocked when user and starter changed the same file", async () =>
   });
 });
 
+test("compatible extension upgrades advance state without migration acknowledgement", async () => {
+  await withFixture(async ({ starter, project }) => {
+    await updateFixtureManifest(starter, (manifest) => { manifest.version = "1.1.0"; });
+    const plan = await planProjectUpgrade(starter, project);
+    const versionChange = plan.extensionChanges.find((entry) => entry.identity === "profile:documentation-only");
+    assert.equal(versionChange.status, "compatible");
+    assert.equal(plan.blocked, false);
+    await applyProjectUpgrade(plan);
+    const state = JSON.parse(await readFile(path.join(project, ".basic-structure", "state.json"), "utf8"));
+    assert.equal(state.extensionVersions["profile:documentation-only"], "1.1.0");
+  });
+});
+
+test("breaking extension upgrades require exact acknowledgement and downgrades stay blocked", async () => {
+  await withFixture(async ({ starter, project }) => {
+    await updateFixtureManifest(starter, (manifest) => {
+      manifest.version = "2.0.0";
+      manifest.migrations = [{ from: "^1.0.0", to: "2.0.0", required: true, description: "Review the renamed profile contract." }];
+    });
+    let plan = await planProjectUpgrade(starter, project);
+    let versionChange = plan.extensionChanges.find((entry) => entry.identity === "profile:documentation-only");
+    assert.equal(versionChange.status, "migration-required");
+    assert.equal(versionChange.acknowledged, false);
+    assert.match(versionChange.notices[0].description, /renamed profile/);
+    assert.equal(plan.blocked, true);
+
+    plan = await planProjectUpgrade(starter, project, { acknowledgements: ["profile:documentation-only"] });
+    versionChange = plan.extensionChanges.find((entry) => entry.identity === "profile:documentation-only");
+    assert.equal(versionChange.acknowledged, true);
+    assert.equal(plan.blocked, false);
+    await applyProjectUpgrade(plan);
+
+    await updateFixtureManifest(starter, (manifest) => {
+      manifest.version = "1.5.0";
+      delete manifest.migrations;
+    });
+    plan = await planProjectUpgrade(starter, project, { acknowledgements: ["profile:documentation-only"] });
+    versionChange = plan.extensionChanges.find((entry) => entry.identity === "profile:documentation-only");
+    assert.equal(versionChange.status, "downgrade-blocked");
+    assert.equal(plan.blocked, true);
+  });
+});
+
+test("versioned requirements reject missing extensions", async () => {
+  await withFixture(async ({ temporaryRoot, starter }) => {
+    await updateFixtureManifest(starter, (manifest) => { manifest.requires = { "module:missing": "^1.0.0" }; });
+    await assert.rejects(
+      () => initializeProject(starter, path.join(temporaryRoot, "invalid-project"), config),
+      /requires module:missing@\^1\.0\.0/
+    );
+  });
+});
+
+test("starter and selected extension version incompatibilities fail before generation", async () => {
+  await withFixture(async ({ temporaryRoot, starter }) => {
+    await updateFixtureManifest(starter, (manifest) => { manifest.starter = ">=2.0.0 <3.0.0"; });
+    await assert.rejects(
+      () => initializeProject(starter, path.join(temporaryRoot, "unsupported-starter"), config),
+      /does not support starter 1\.0\.0/
+    );
+
+    await updateFixtureManifest(starter, (manifest) => {
+      manifest.starter = ">=1.0.0 <2.0.0";
+      manifest.requires = { "module:sample": "^2.0.0" };
+    });
+    await put(starter, "modules/sample/template/sample.txt", "sample\n");
+    await put(starter, "modules/sample/module.json", `${JSON.stringify({
+      schemaVersion: 2, kind: "module", id: "sample", version: "1.0.0", starter: "^1.0.0",
+      name: "Sample", description: "Sample module", files: "template", requires: {}, conflicts: []
+    }, null, 2)}\n`);
+    const selectedConfig = { ...config, modules: ["sample"] };
+    await assert.rejects(
+      () => initializeProject(starter, path.join(temporaryRoot, "incompatible-requirement"), selectedConfig),
+      /requires module:sample@\^2\.0\.0, selected 1\.0\.0/
+    );
+
+    await updateFixtureManifest(starter, (manifest) => { manifest.requires = { "module:sample": "^1.0.0" }; });
+    const modulePath = path.join(starter, "modules", "sample", "module.json");
+    const moduleManifest = JSON.parse(await readFile(modulePath, "utf8"));
+    moduleManifest.requires = { "profile:documentation-only": "^1.0.0" };
+    await writeFile(modulePath, `${JSON.stringify(moduleManifest, null, 2)}\n`, "utf8");
+    await assert.rejects(
+      () => initializeProject(starter, path.join(temporaryRoot, "requirement-cycle"), selectedConfig),
+      /Extension requirement cycle/
+    );
+  });
+});
+
 test("retired unmodified files are backed up and deleted", async () => {
   await withFixture(async ({ starter, project }) => {
     await unlink(path.join(starter, "profiles", "documentation-only", "template", "retire.txt"));
@@ -130,6 +252,7 @@ test("modified retired files and legacy state differences fail closed", async ()
     const statePath = path.join(project, ".basic-structure", "state.json");
     const state = JSON.parse(await readFile(statePath, "utf8"));
     state.schemaVersion = 1;
+    delete state.extensionVersions;
     for (const entry of state.generatedFiles) {
       delete entry.hash;
       delete entry.hashAlgorithm;

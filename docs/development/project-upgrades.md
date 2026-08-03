@@ -18,6 +18,19 @@ directory and performs no writes to the target. Review every non-`unchanged`
 entry. `user-modified` files are preserved automatically. `conflict` and
 `legacy-conflict` entries block the complete apply operation.
 
+The plan also reports extension version changes. A major update or a manifest
+migration marked `required` blocks apply until the exact qualified id is
+acknowledged:
+
+```text
+node scripts/update-project.mjs --project ../example-saas --plan --acknowledge-migration module:auth-session
+node scripts/update-project.mjs --project ../example-saas --apply --acknowledge-migration module:auth-session
+```
+
+Acknowledgement confirms that the printed instructions were reviewed. It does
+not execute them and never bypasses file conflicts. Extension downgrades remain
+blocked even when an acknowledgement is supplied.
+
 Text hashes normalize LF and CRLF so ordinary cross-platform Git checkouts do
 not look like user modifications. Binary files are hashed byte-for-byte.
 
@@ -25,6 +38,10 @@ State schema version 1 did not record content hashes. A legacy file can be
 adopted automatically only when it already equals current starter output. Any
 difference requires manual review; the engine will not guess whether it came
 from the user or an older starter version.
+
+State schema version 2 has file hashes but no extension versions. Its first
+upgrade records the current version baseline as `baseline-adoption`; hash-based
+file safety remains in force.
 
 ## Apply
 

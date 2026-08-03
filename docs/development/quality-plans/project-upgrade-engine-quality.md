@@ -16,7 +16,7 @@ conflict.
 
 | Acceptance area | Evidence |
 |---|---|
-| State v2 hashes | Initializer and upgrade unit tests |
+| State v3 hashes and versions | Initializer and upgrade unit tests |
 | Read-only plan | Filesystem snapshot assertion |
 | Safe update and new file | Upgrade integration test |
 | User modification preservation | Upgrade conflict tests |
@@ -27,12 +27,12 @@ conflict.
 
 ## Verification summary
 
-- `npm test`: 17 passed, 1 skipped because this Windows host does not permit
+- Current combined suite: 27 passed, 1 skipped because this Windows host does not permit
   symlink creation; traversal and invalid-path rejection still passed.
-- `npm run verify`: passed with 52 documents and 12 extensions.
-- Clean full-stack generation: 169 files written, including 167 hashed managed
-  files in state schema version 2.
-- Clean-project upgrade plan: 167 `unchanged`, no writes and no conflicts.
+- `npm run verify`: passed with 55 documents and 12 extensions.
+- Clean full-stack generation: 172 files written, including 170 hashed managed
+  files; state schema version 3 now also records extension versions.
+- Clean-project upgrade plan: 170 `unchanged`, no writes and no conflicts.
 - `git diff --check`: passed; Git reported only expected checkout line-ending
   notices.
 

@@ -56,7 +56,13 @@ Current adapters:
 Every extension has a versioned manifest validated against
 `schemas/extension-manifest.schema.json`. Its `files` directory is copied into
 the generated repository. Generation stops on unknown extensions, unmet
-requirements, declared conflicts, or file collisions.
+or incompatible version requirements, unsupported starter versions, declared
+conflicts, or file collisions. See the built-in
+[`compatibility matrix`](extension-compatibility.md).
+
+Manifest schema version 2 requires `version`, `starter`, and version ranges for
+every entry in `requires`. Optional `migrations` are inert operator notices;
+they are never executable extension hooks.
 
 After composition, the initializer records each generated file's extension
 owner and SHA-256 baseline in `.basic-structure/state.json`. The upgrade engine
@@ -71,10 +77,11 @@ initializer renders these values without executing template code.
 
 1. Create `profiles/<id>`, `modules/<id>`, or `adapters/<id>`.
 2. Add the matching manifest and a `template/` directory.
-3. Keep file ownership disjoint from other selectable extensions.
-4. Add the extension to an example configuration.
-5. Add a bootstrap test that inspects its generated output.
-6. Run `node scripts/verify.mjs --mode template`.
+3. Assign a SemVer version, starter range, and versioned requirements.
+4. Keep file ownership disjoint from other selectable extensions.
+5. Add the extension to the compatibility matrix and an example configuration.
+6. Add a bootstrap test that inspects its generated output.
+7. Run `node scripts/verify.mjs --mode template`.
 
 ## Document status
 

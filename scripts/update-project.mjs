@@ -4,10 +4,15 @@ import { fileURLToPath } from "node:url";
 import { applyProjectUpgrade, planProjectUpgrade, summarizeUpgradePlan } from "./lib/upgrade.mjs";
 
 function parseArguments(argv) {
-  const options = { project: ".", apply: false };
+  const options = { project: ".", apply: false, acknowledgements: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--project") options.project = argv[++index];
+    else if (argument === "--acknowledge-migration") {
+      const identity = argv[++index];
+      if (!/^(profile|module|adapter):[a-z][a-z0-9-]*$/.test(identity ?? "")) throw new Error("--acknowledge-migration requires a qualified extension id.");
+      options.acknowledgements.push(identity);
+    }
     else if (argument === "--apply") options.apply = true;
     else if (argument === "--plan") options.apply = false;
     else if (argument === "--help" || argument === "-h") options.help = true;
@@ -17,7 +22,7 @@ function parseArguments(argv) {
 }
 
 function printHelp() {
-  console.log("Usage: node scripts/update-project.mjs --project <generated-project> [--plan|--apply]");
+  console.log("Usage: node scripts/update-project.mjs --project <generated-project> [--plan|--apply] [--acknowledge-migration <qualified-id>]");
   console.log("Plan is the default and never modifies the target project. Apply refuses conflicts.");
 }
 
@@ -28,7 +33,12 @@ try {
   if (options.help) {
     printHelp();
   } else {
-    const plan = await planProjectUpgrade(starterRoot, path.resolve(process.cwd(), options.project));
+    const plan = await planProjectUpgrade(starterRoot, path.resolve(process.cwd(), options.project), { acknowledgements: options.acknowledgements });
+    for (const change of plan.extensionChanges.filter((entry) => entry.status !== "unchanged")) {
+      const versions = `${change.fromVersion ?? "none"} -> ${change.toVersion ?? "none"}`;
+      console.log(`${change.status.toUpperCase().padEnd(20)} ${change.identity} ${versions}${change.acknowledged ? "" : " — acknowledgement required"}`);
+      for (const notice of change.notices) console.log(`  Migration: ${notice.description}`);
+    }
     for (const change of plan.changes.filter((entry) => entry.status !== "unchanged")) {
       console.log(`${change.status.toUpperCase().padEnd(16)} ${change.path} — ${change.reason}`);
     }
@@ -50,4 +60,3 @@ try {
   printHelp();
   process.exitCode = 1;
 }
-

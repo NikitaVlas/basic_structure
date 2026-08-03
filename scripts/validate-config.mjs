@@ -11,9 +11,10 @@ try {
   const config = await readJson(configPath);
   const resolved = await resolveConfiguration(starterRoot, config);
   console.log(`Configuration is valid: ${config.project.name}`);
-  console.log(`Profile: ${resolved.profile.manifest.id}`);
-  console.log(`Modules: ${config.modules.join(", ") || "none"}`);
-  console.log(`Adapters: ${config.adapters.join(", ") || "none"}`);
+  console.log(`Starter: ${resolved.starterVersion}`);
+  console.log(`Profile: ${resolved.profile.manifest.id}@${resolved.profile.manifest.version}`);
+  console.log(`Modules: ${resolved.modules.map(({ manifest }) => `${manifest.id}@${manifest.version}`).join(", ") || "none"}`);
+  console.log(`Adapters: ${resolved.adapters.map(({ manifest }) => `${manifest.id}@${manifest.version}`).join(", ") || "none"}`);
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;

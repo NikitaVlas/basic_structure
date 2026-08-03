@@ -1,12 +1,14 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "adapter",
   "id": "docker-production",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "Production Docker deployment",
   "description": "Hardened API, worker, and webapp images with private dependencies, migrations, health checks, smoke validation, and rollback guidance.",
   "files": "template",
-  "requires": ["profile:fullstack-web", "module:database-postgres", "module:observability", "module:transactional-email", "module:rate-limit-valkey", "module:auth-session"],
+  "requires": { "profile:fullstack-web": "^1.0.0", "module:database-postgres": "^1.0.0", "module:observability": "^1.0.0", "module:transactional-email": "^1.0.0", "module:rate-limit-valkey": "^1.0.0", "module:auth-session": "^1.0.0" },
   "conflicts": [],
   "packageDependencies": {
     "package.json": {

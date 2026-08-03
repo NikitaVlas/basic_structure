@@ -1,12 +1,14 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "module",
   "id": "rate-limit-valkey",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "Distributed rate limiting",
   "description": "Pluggable memory and Valkey fixed-window rate limiting with HMAC-pseudonymous keys.",
   "files": "template",
-  "requires": ["module:observability"],
+  "requires": { "module:observability": "^1.0.0" },
   "conflicts": [],
   "contributions": { "API_ENV": "contributions/api-env.txt" },
   "packageDependencies": {

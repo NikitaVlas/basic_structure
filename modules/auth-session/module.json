@@ -1,12 +1,14 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "module",
   "id": "auth-session",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "Secure session authentication",
   "description": "Registration, login, logout, current-user API, opaque cookie sessions, rate limiting, and browser forms.",
   "files": "template",
-  "requires": ["module:shared-contracts", "module:database-postgres", "module:observability", "module:transactional-email", "module:rate-limit-valkey"],
+  "requires": { "module:shared-contracts": "^1.0.0", "module:database-postgres": "^1.0.0", "module:observability": "^1.0.0", "module:transactional-email": "^1.0.0", "module:rate-limit-valkey": "^1.0.0" },
   "conflicts": [],
   "contributions": {
     "API_IMPORTS": "contributions/api-imports.txt",

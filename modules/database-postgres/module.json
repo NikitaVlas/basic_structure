@@ -1,12 +1,14 @@
 {
   "$schema": "../../schemas/extension-manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "module",
   "id": "database-postgres",
+  "version": "1.0.0",
+  "starter": ">=0.1.0 <1.0.0",
   "name": "PostgreSQL persistence",
   "description": "Connection pooling, ordered transactional migrations, and parameterized user/session repositories.",
   "files": "template",
-  "requires": [],
+  "requires": {},
   "conflicts": [],
   "contributions": {
     "API_ENV": "contributions/api-env.txt",
