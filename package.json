@@ -1,0 +1,16 @@
+{
+  "name": "basic-structure",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "config:check": "node scripts/validate-config.mjs",
+    "docs:check": "node scripts/check-docs.mjs --mode template",
+    "init": "node scripts/init-project.mjs",
+    "test": "node --test",
+    "verify": "node scripts/verify.mjs --mode template"
+  }
+}

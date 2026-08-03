@@ -13,6 +13,22 @@ after the relevant decisions are clear.
 
 ## Initialization
 
+When `project.config.json` exists, validate it before generating anything:
+
+```text
+node scripts/validate-config.mjs project.config.json
+```
+
+Choose one profile, only the modules required by the product, and only the
+adapters required by the delivery environment. Use `--dry-run` before the first
+generation. Never generate into a non-empty directory, bypass collision checks,
+or treat `.basic-structure/state.json` as user-editable configuration.
+
+The configuration and generated runtime do not replace the intake process.
+Product, architecture, security, verification, and approval decisions still
+must be completed before feature implementation and before generated CI is
+expected to pass.
+
 Use `README.md` as the entry point and complete
 `docs/development/initialization-checklist.md` before feature work.
 

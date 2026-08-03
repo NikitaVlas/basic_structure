@@ -1,0 +1,15 @@
+{
+  "$schema": "./schemas/project-config.schema.json",
+  "schemaVersion": 1,
+  "project": {
+    "name": "example-saas",
+    "description": "A generated full-stack web product",
+    "profile": "fullstack-web"
+  },
+  "surfaces": ["api", "webapp", "website"],
+  "modules": ["shared-contracts", "observability"],
+  "adapters": ["github-ci"],
+  "verification": {
+    "required": true
+  }
+}

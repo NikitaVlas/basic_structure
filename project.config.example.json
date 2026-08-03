@@ -1,0 +1,15 @@
+{
+  "$schema": "./schemas/project-config.schema.json",
+  "schemaVersion": 1,
+  "project": {
+    "name": "example-project",
+    "description": "Replace with a concise product description",
+    "profile": "documentation-only"
+  },
+  "surfaces": [],
+  "modules": [],
+  "adapters": [],
+  "verification": {
+    "required": true
+  }
+}

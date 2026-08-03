@@ -1,5 +1,49 @@
 # Project starter
 
+This repository is both a stack-neutral AI delivery framework and an
+executable project generator. It separates durable process rules from
+selectable application profiles, modules, and external-platform adapters.
+
+## Executable quick start
+
+Requirements: Git and Node.js 22.12 or newer. The starter itself has no runtime
+dependencies; the current full-stack profile uses the same supported baseline.
+
+Validate the starter:
+
+```text
+node --test
+node scripts/verify.mjs --mode template
+```
+
+Preview a generated full-stack project without writing output:
+
+```text
+node scripts/init-project.mjs --config project.config.fullstack.example.json --output work/example --dry-run
+```
+
+Generate it into a new or empty directory:
+
+```text
+node scripts/init-project.mjs --config project.config.fullstack.example.json --output ../example-saas
+```
+
+The initializer never overwrites a non-empty output directory. Generated files
+and their owning extensions are recorded in `.basic-structure/state.json`.
+
+Available composition primitives are documented in
+[`docs/development/extensions.md`](docs/development/extensions.md).
+
+### Configuration
+
+- `project.config.example.json` demonstrates a documentation-only project.
+- `project.config.fullstack.example.json` demonstrates the executable web
+  profile with shared contracts, observability, and GitHub CI.
+- `schemas/project-config.schema.json` is the versioned configuration contract.
+
+Copy an example to `project.config.json`, record real product decisions, and
+then initialize the project. Do not edit generated state by hand.
+
 ## Start command
 
 Use the exact phrase `СТАРТ ПРОЕКТА` to begin a new project initialization with

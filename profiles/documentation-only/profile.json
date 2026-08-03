@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schemas/extension-manifest.schema.json",
+  "schemaVersion": 1,
+  "kind": "profile",
+  "id": "documentation-only",
+  "name": "Documentation-only project",
+  "description": "Keeps the process, architecture, quality, and agent documentation without generating an application runtime.",
+  "files": "template",
+  "requires": [],
+  "conflicts": []
+}

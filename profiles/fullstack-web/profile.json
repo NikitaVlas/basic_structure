@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schemas/extension-manifest.schema.json",
+  "schemaVersion": 1,
+  "kind": "profile",
+  "id": "fullstack-web",
+  "name": "Full-stack web product",
+  "description": "TypeScript monorepo with an API, authenticated React application surface, and public Astro website surface.",
+  "files": "template",
+  "requires": ["module:shared-contracts"],
+  "conflicts": []
+}

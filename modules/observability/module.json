@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schemas/extension-manifest.schema.json",
+  "schemaVersion": 1,
+  "kind": "module",
+  "id": "observability",
+  "name": "Structured observability foundation",
+  "description": "Dependency-free structured logger with secret-field redaction.",
+  "files": "template",
+  "requires": [],
+  "conflicts": []
+}
