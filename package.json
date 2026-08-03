@@ -1,9 +1,32 @@
 {
-  "name": "basic-structure",
+  "name": "@basic-structure/cli",
   "version": "0.1.0",
-  "private": true,
+  "description": "Plan-first project lifecycle, composition, policy, and CI harness CLI.",
+  "license": "UNLICENSED",
   "type": "module",
   "bin": { "basic-structure": "./bin/basic-structure.mjs" },
+  "exports": {
+    ".": "./scripts/lib/cli.mjs",
+    "./configuration": "./scripts/lib/configuration.mjs"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "schemas/",
+    "profiles/",
+    "modules/",
+    "adapters/",
+    "presets/",
+    "policies/",
+    "agent/",
+    "docs/",
+    "tasks/",
+    "AGENTS.md",
+    "AI-SETUP.md",
+    "README.md",
+    "project.config.example.json",
+    "project.config.fullstack.example.json"
+  ],
   "engines": {
     "node": ">=22.12"
   },
@@ -14,6 +37,7 @@
     "init": "node scripts/init-project.mjs",
     "update": "node scripts/update-project.mjs",
     "test": "node --test test/*.test.mjs",
-    "verify": "node scripts/verify.mjs --mode template"
+    "verify": "node scripts/verify.mjs --mode template",
+    "package:check": "node scripts/verify-package.mjs"
   }
 }

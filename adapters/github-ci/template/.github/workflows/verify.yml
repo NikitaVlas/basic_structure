@@ -20,5 +20,7 @@ jobs:
       - name: Install dependencies
         # Replace with npm ci after the first reviewed package-lock.json is committed.
         run: npm install --ignore-scripts
+      - name: Basic Structure gate
+        run: npm run harness:gate
       - name: Verify
         run: npm run verify

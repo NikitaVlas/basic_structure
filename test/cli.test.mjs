@@ -39,6 +39,10 @@ test("CLI root and command help are stable", async () => {
   assert.match(envelope.data.text, /--acknowledge-migration/);
   result = await invoke(["help", "switch-profile"]);
   assert.match(result.stdout, /--prune-incompatible/);
+  result = await invoke(["version", "--json"]);
+  const version = JSON.parse(result.stdout);
+  assert.equal(version.data.package.name, "@basic-structure/cli");
+  assert.match(version.data.catalog.digest, /^[a-f0-9]{64}$/);
 });
 
 test("CLI switch-profile exposes plan and apply evidence", async () => {

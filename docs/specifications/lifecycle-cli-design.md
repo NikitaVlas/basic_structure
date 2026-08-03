@@ -31,6 +31,7 @@ testable library functions and exposes these commands:
 - `policy`: list, explain, evaluate, and explicitly remediate harness rules;
 - `drift`: strictly compare managed state with the current starter;
 - `gate`: aggregate all read-only CI harness evidence;
+- `version`: expose package, schema, Node, and catalog digest provenance;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.

@@ -8,8 +8,9 @@ Run the CLI from the `basic_structure` repository:
 node bin/basic-structure.mjs --help
 ```
 
-`npm run cli -- <command>` is equivalent. The CLI is not copied into generated
-projects and is not yet published as an npm package.
+`npm run cli -- <command>` is equivalent. The source is packaged as
+`@basic-structure/cli`; registry publication remains an explicit owner action
+after licensing and release review.
 
 ## Commands
 
@@ -130,6 +131,15 @@ node bin/basic-structure.mjs gate check --project ../example-saas --json
 ```
 
 Gate failures use exit code `5`. See [`CI gates`](ci-gates.md).
+
+### Inspect package provenance
+
+```text
+node bin/basic-structure.mjs version --json
+npm run package:check
+```
+
+See [`CLI installation`](cli-installation.md).
 
 ### Diagnose
 

@@ -10,6 +10,7 @@ import { configurationFromPreset, listPresets, loadPreset } from "./presets.mjs"
 import { inspectCatalogEntry, recommendCapabilities, searchCatalog } from "./catalog.mjs";
 import { checkProjectPolicies, listPolicies, loadPolicy } from "./policies.mjs";
 import { checkProjectDrift, checkProjectGate } from "./gates.mjs";
+import { getPackageProvenance } from "./provenance.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -43,6 +44,7 @@ Commands:
   policy     List, explain, check, or remediate harness policies
   drift      Check generated project drift
   gate       Run or explain the unified read-only CI gate
+  version    Show package and catalog provenance
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -70,6 +72,7 @@ const COMMAND_HELP = {
   policy: "Usage: basic-structure policy <list|explain|check|apply> [id] [--project <directory>] [--plan|--apply] [--json]",
   drift: "Usage: basic-structure drift check [--project <directory>] [--json]",
   gate: "Usage: basic-structure gate <check|explain> [--project <directory>] [--json]",
+  version: "Usage: basic-structure version [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -371,6 +374,11 @@ async function execute(command, argv, context) {
     const data = await checkProjectGate(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });
     if (!data.compliant) throw new CliError("CI harness gate failed.", "GATE_FAILED", 5, data);
     return success(command, { action, ...data }, data.checks.map((check) => `${check.status.toUpperCase()} ${check.id}: ${check.message}`));
+  }
+  if (command === "version") {
+    if (argv.length) rejectUnknown(argv[0]);
+    const data = await getPackageProvenance(starterRoot);
+    return success(command, data, [`${data.package.name}@${data.package.version}`, `Catalog: ${data.catalog.algorithm}:${data.catalog.digest} (${data.catalog.files} files)`, `Node: ${data.node}`]);
   }
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");

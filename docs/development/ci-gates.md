@@ -15,10 +15,10 @@ the project's `verify` script; CI should run that script as a separate step.
 
 The starter repository includes
 `.github/workflows/basic-structure-gate.yml`, which runs gate regression tests
-and validates the complete local catalog. Generated repositories can invoke the
-same `gate check` command once the CLI is installed or vendored at a reviewed,
-pinned path. Automatic network installation is intentionally excluded until
-CLI packaging and provenance are implemented.
+and validates the complete local catalog. Generated full-stack repositories use
+an exact pinned CLI dev dependency and `npm run harness:gate`. Install from the
+reviewed lockfile before the gate; runtime network installation remains
+forbidden.
 
 Resolve drift through the normal `update --plan` workflow. Resolve policy gaps
 through reviewed documentation or `policy apply --plan`. Never rewrite state or
@@ -30,4 +30,3 @@ operation reports manually merely to make the gate pass.
 - Owner: Project maintainers
 - Last reviewed: 2026-08-03
 - Related: `docs/specifications/ci-gate-design.md`
-

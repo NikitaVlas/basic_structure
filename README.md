@@ -117,6 +117,15 @@ node bin/basic-structure.mjs gate check --project ../example-saas
 
 See [`CI gates`](docs/development/ci-gates.md).
 
+Verify the self-contained scoped npm package and its catalog provenance:
+
+```text
+npm run package:check
+npx basic-structure version --json
+```
+
+See [`CLI installation`](docs/development/cli-installation.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.
