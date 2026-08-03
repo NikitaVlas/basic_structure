@@ -109,6 +109,14 @@ node bin/basic-structure.mjs policy check --project ../example-saas
 
 See [`harness policies`](docs/development/harness-policies.md).
 
+Use the unified read-only CI gate to detect drift and policy violations:
+
+```text
+node bin/basic-structure.mjs gate check --project ../example-saas
+```
+
+See [`CI gates`](docs/development/ci-gates.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

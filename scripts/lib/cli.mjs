@@ -9,6 +9,7 @@ import { createExtensionScaffold, testAuthoredExtension, validateAuthoredExtensi
 import { configurationFromPreset, listPresets, loadPreset } from "./presets.mjs";
 import { inspectCatalogEntry, recommendCapabilities, searchCatalog } from "./catalog.mjs";
 import { checkProjectPolicies, listPolicies, loadPolicy } from "./policies.mjs";
+import { checkProjectDrift, checkProjectGate } from "./gates.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -40,6 +41,8 @@ Commands:
   inspect-preset  Inspect a resolved preset
   recommend  Recommend a compatible capability composition
   policy     List, explain, check, or remediate harness policies
+  drift      Check generated project drift
+  gate       Run or explain the unified read-only CI gate
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -65,6 +68,8 @@ const COMMAND_HELP = {
   "inspect-preset": "Usage: basic-structure inspect-preset <id> [--json]",
   recommend: "Usage: basic-structure recommend --capability <id> [--capability <id>...] [--profile <id>] [--json]",
   policy: "Usage: basic-structure policy <list|explain|check|apply> [id] [--project <directory>] [--plan|--apply] [--json]",
+  drift: "Usage: basic-structure drift check [--project <directory>] [--json]",
+  gate: "Usage: basic-structure gate <check|explain> [--project <directory>] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -353,6 +358,20 @@ async function execute(command, argv, context) {
     }
     throw new CliError("policy requires list, explain, check, or apply.");
   }
+  if (command === "drift") {
+    const action = argv.shift(); if (action !== "check") throw new CliError("drift requires check.");
+    const project = parseSinglePath(argv, "--project", ".");
+    const data = await checkProjectDrift(starterRoot, path.resolve(cwd, project));
+    if (!data.clean) throw new CliError("Managed project drift detected.", "DRIFT_DETECTED", 5, data);
+    return success(command, data, ["PASS drift: managed project matches the starter."]);
+  }
+  if (command === "gate") {
+    const action = argv.shift(); if (!new Set(["check", "explain"]).has(action)) throw new CliError("gate requires check or explain.");
+    const project = parseSinglePath(argv, "--project", ".");
+    const data = await checkProjectGate(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });
+    if (!data.compliant) throw new CliError("CI harness gate failed.", "GATE_FAILED", 5, data);
+    return success(command, { action, ...data }, data.checks.map((check) => `${check.status.toUpperCase()} ${check.id}: ${check.message}`));
+  }
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");
     const diagnosis = await diagnoseProject(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });
@@ -408,6 +427,7 @@ export async function runCli(options) {
     else {
       if (error.data?.checks) for (const entry of error.data.checks) stderr.write(`${entry.status.toUpperCase().padEnd(4)} ${entry.id}: ${entry.message}\n`);
       if (error.code === "POLICY_VIOLATION") for (const result of error.data.results) stderr.write(`${result.status.toUpperCase()} ${result.id}: ${result.message}\n`);
+      if (error.code === "GATE_FAILED") for (const check of error.data.checks) stderr.write(`${check.status.toUpperCase()} ${check.id}: ${check.message}\n`);
       if (error.code === "UPGRADE_BLOCKED" || error.code === "COMPOSITION_BLOCKED" || error.code === "PROFILE_MIGRATION_BLOCKED" || error.code === "PRESET_BLOCKED") {
         for (const entry of error.data.extensionChanges.filter((change) => change.status !== "unchanged")) {
           stderr.write(`${entry.status.toUpperCase()} ${entry.identity} ${entry.fromVersion ?? "none"} -> ${entry.toVersion ?? "none"}${entry.acknowledged ? "" : " — acknowledgement required"}\n`);

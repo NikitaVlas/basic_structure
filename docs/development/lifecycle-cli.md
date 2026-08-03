@@ -122,6 +122,15 @@ node bin/basic-structure.mjs policy apply production-readiness --project ../exam
 Policy violations use exit code `4`. See
 [`harness policies`](harness-policies.md).
 
+### Run the CI gate
+
+```text
+node bin/basic-structure.mjs drift check --project ../example-saas
+node bin/basic-structure.mjs gate check --project ../example-saas --json
+```
+
+Gate failures use exit code `5`. See [`CI gates`](ci-gates.md).
+
 ### Diagnose
 
 ```text

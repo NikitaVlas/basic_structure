@@ -29,6 +29,8 @@ testable library functions and exposes these commands:
 - `inspect` and `inspect-preset`: expose exact catalog evidence;
 - `recommend`: derive a read-only capability composition and preset matches;
 - `policy`: list, explain, evaluate, and explicitly remediate harness rules;
+- `drift`: strictly compare managed state with the current starter;
+- `gate`: aggregate all read-only CI harness evidence;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.
@@ -58,6 +60,7 @@ Exit codes:
 - `2`: update blocked by migration or file conflicts;
 - `3`: doctor completed and found a required failing check.
 - `4`: an applicable error-severity harness policy failed.
+- `5`: managed drift or the unified CI harness gate failed.
 
 ## Doctor contract
 

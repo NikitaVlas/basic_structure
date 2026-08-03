@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, rm, unlink } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -156,6 +156,26 @@ test("CLI policy commands expose compliance and violation exit code", async () =
     assert.deepEqual(envelope.data.results[0].missingFiles, ["AGENTS.md"]);
   } finally { await rm(temporaryRoot, { recursive: true, force: true }); }
 });
+
+test("CLI drift and gate commands use stable CI exit code", async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "basic-structure-cli-gate-"));
+  try {
+    const output = await initializeFixture(temporaryRoot);
+    const probeExecutable = (command) => ({ available: true, version: `${command} test` });
+    let result = await invoke(["gate", "check", "--project", output, "--json"], { probeExecutable });
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    await writeFile(path.join(output, "AGENTS.md"), "drift\n", "utf8");
+    result = await invoke(["drift", "check", "--project", output, "--json"]);
+    let envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 5);
+    assert.equal(envelope.error.code, "DRIFT_DETECTED");
+    result = await invoke(["gate", "explain", "--project", output, "--json"], { probeExecutable });
+    envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 5);
+    assert.equal(envelope.error.code, "GATE_FAILED");
+  } finally { await rm(temporaryRoot, { recursive: true, force: true }); }
+});
+
 
 
 test("CLI JSON validate and list commands expose versioned data", async () => {
