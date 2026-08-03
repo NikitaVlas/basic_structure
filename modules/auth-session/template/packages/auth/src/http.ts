@@ -4,13 +4,26 @@ import { apiError, emailRequestSchema, loginRequestSchema, passwordResetRequestS
 import { AccountTokenRepository, createDatabasePool, SecurityAuditRepository, SessionRepository, UserRepository } from "@{{PROJECT_NAME}}/database";
 import type { Pool } from "pg";
 import { log } from "@{{PROJECT_NAME}}/observability";
+import { createRateLimiter, RateLimitBackendUnavailableError, type RateLimiter, type RateLimitPolicy } from "@{{PROJECT_NAME}}/rate-limit";
 import { clearSessionCookie, createSessionCookie, readSessionCookie } from "./cookies.js";
-import { FixedWindowRateLimiter } from "./rate-limit.js";
 import { AuthService, EmailConflictError, InvalidAccountTokenError, InvalidCredentialsError } from "./service.js";
 
-const limiter = new FixedWindowRateLimiter();
+const RATE_LIMIT_POLICIES = {
+  register: { limit: 5, windowMs: 15 * 60_000 },
+  login: { limit: 5, windowMs: 5 * 60_000 },
+  "login-account": { limit: 10, windowMs: 15 * 60_000 },
+  forgot: { limit: 5, windowMs: 15 * 60_000 },
+  "forgot-account": { limit: 5, windowMs: 15 * 60_000 },
+  reset: { limit: 5, windowMs: 15 * 60_000 },
+  "reset-token": { limit: 5, windowMs: 15 * 60_000 },
+  verify: { limit: 3, windowMs: 15 * 60_000 }
+} satisfies Record<string, RateLimitPolicy>;
+
+let limiter: RateLimiter | undefined;
 let service: AuthService | undefined;
 let pool: Pool | undefined;
+function getLimiter() { return limiter ??= createRateLimiter(); }
+export async function checkAuthRateLimitReadiness() { return getLimiter().ready(); }
 function getService() {
   if (!service) {
     const durationDays = Number.parseInt(process.env.SESSION_DURATION_DAYS ?? "7", 10);
@@ -30,9 +43,11 @@ function getService() {
 
 export async function closeAuthResources() {
   const activePool = pool;
+  const activeLimiter = limiter;
   pool = undefined;
   service = undefined;
-  limiter.clear();
+  limiter = undefined;
+  if (activeLimiter) await activeLimiter.close();
   if (activePool) await activePool.end();
 }
 
@@ -104,11 +119,16 @@ export async function handleAuthRequest(request: IncomingMessage, response: Serv
   if ((request.method === "POST" || request.method === "DELETE") && !hasAllowedOrigin(request)) {
     sendError(response, 403, "FORBIDDEN", "Request origin is not allowed", requestId); return true;
   }
+  if (request.method === "GET" && url.pathname.endsWith("/rate-limit-ready")) {
+    const ready = await checkAuthRateLimitReadiness();
+    send(response, ready ? 200 : 503, { status: ready ? "ready" : "unavailable" }); return true;
+  }
   const authService = getService();
   try {
     if (request.method === "POST" && (url.pathname.endsWith("/register") || url.pathname.endsWith("/login"))) {
       const source = request.socket.remoteAddress ?? "unknown";
-      const rate = limiter.consume(`${url.pathname.endsWith("/register") ? "register" : "login"}:${source}`);
+      const scope = url.pathname.endsWith("/register") ? "register" : "login";
+      const rate = await getLimiter().consume(scope, source, RATE_LIMIT_POLICIES[scope]);
       if (!rate.allowed) {
         response.setHeader("retry-after", String(rate.retryAfterSeconds));
         sendError(response, 429, "RATE_LIMITED", "Too many authentication attempts", requestId); return true;
@@ -117,6 +137,13 @@ export async function handleAuthRequest(request: IncomingMessage, response: Serv
       const parsed = schema.safeParse(await readJson(request));
       if (!parsed.success) {
         sendError(response, 422, "VALIDATION_ERROR", "Invalid request data", requestId, validationDetails(parsed.error)); return true;
+      }
+      if (scope === "login") {
+        const accountRate = await getLimiter().consume("login-account", parsed.data.email, RATE_LIMIT_POLICIES["login-account"]);
+        if (!accountRate.allowed) {
+          response.setHeader("retry-after", String(accountRate.retryAfterSeconds));
+          sendError(response, 429, "RATE_LIMITED", "Too many authentication attempts", requestId); return true;
+        }
       }
       const result = url.pathname.endsWith("/register")
         ? await authService.register(parsed.data as never, sessionClientContext(request))
@@ -127,7 +154,7 @@ export async function handleAuthRequest(request: IncomingMessage, response: Serv
       send(response, url.pathname.endsWith("/register") ? 201 : 200, result.response); return true;
     }
     if (request.method === "POST" && url.pathname.endsWith("/password/forgot")) {
-      const rate = limiter.consume(`forgot:${request.socket.remoteAddress ?? "unknown"}`);
+      const rate = await getLimiter().consume("forgot", request.socket.remoteAddress ?? "unknown", RATE_LIMIT_POLICIES.forgot);
       if (!rate.allowed) {
         response.setHeader("retry-after", String(rate.retryAfterSeconds));
         sendError(response, 429, "RATE_LIMITED", "Too many recovery attempts", requestId); return true;
@@ -136,13 +163,18 @@ export async function handleAuthRequest(request: IncomingMessage, response: Serv
       if (!parsed.success) {
         sendError(response, 422, "VALIDATION_ERROR", "Invalid request data", requestId, validationDetails(parsed.error)); return true;
       }
+      const accountRate = await getLimiter().consume("forgot-account", parsed.data.email, RATE_LIMIT_POLICIES["forgot-account"]);
+      if (!accountRate.allowed) {
+        response.setHeader("retry-after", String(accountRate.retryAfterSeconds));
+        sendError(response, 429, "RATE_LIMITED", "Too many recovery attempts", requestId); return true;
+      }
       const userId = await authService.requestPasswordReset(parsed.data.email);
       await authService.recordSecurityEvent({ ...(userId ? { userId } : {}), eventType: "password_reset_requested", outcome: "success", requestId });
       log("info", "password_reset_requested", { requestId });
       send(response, 202, { message: "If an account exists, a reset email has been sent." }); return true;
     }
     if (request.method === "POST" && url.pathname.endsWith("/password/reset")) {
-      const rate = limiter.consume(`reset:${request.socket.remoteAddress ?? "unknown"}`);
+      const rate = await getLimiter().consume("reset", request.socket.remoteAddress ?? "unknown", RATE_LIMIT_POLICIES.reset);
       if (!rate.allowed) {
         response.setHeader("retry-after", String(rate.retryAfterSeconds));
         sendError(response, 429, "RATE_LIMITED", "Too many recovery attempts", requestId); return true;
@@ -150,6 +182,11 @@ export async function handleAuthRequest(request: IncomingMessage, response: Serv
       const parsed = passwordResetRequestSchema.safeParse(await readJson(request));
       if (!parsed.success) {
         sendError(response, 422, "VALIDATION_ERROR", "Invalid request data", requestId, validationDetails(parsed.error)); return true;
+      }
+      const tokenRate = await getLimiter().consume("reset-token", parsed.data.token, RATE_LIMIT_POLICIES["reset-token"]);
+      if (!tokenRate.allowed) {
+        response.setHeader("retry-after", String(tokenRate.retryAfterSeconds));
+        sendError(response, 429, "RATE_LIMITED", "Too many recovery attempts", requestId); return true;
       }
       const reset = await authService.resetPassword(parsed.data);
       await authService.recordSecurityEvent({ userId: reset.userId, eventType: "password_reset", outcome: "success", requestId });
@@ -210,7 +247,7 @@ export async function handleAuthRequest(request: IncomingMessage, response: Serv
       if (!user) {
         sendError(response, 401, "UNAUTHENTICATED", "Authentication required", requestId); return true;
       }
-      const rate = limiter.consume(`verify:${user.id}`);
+      const rate = await getLimiter().consume("verify", user.id, RATE_LIMIT_POLICIES.verify);
       if (!rate.allowed) {
         response.setHeader("retry-after", String(rate.retryAfterSeconds));
         sendError(response, 429, "RATE_LIMITED", "Too many verification attempts", requestId); return true;
@@ -230,7 +267,10 @@ export async function handleAuthRequest(request: IncomingMessage, response: Serv
     }
     sendError(response, 404, "NOT_FOUND", "Route not found", requestId); return true;
   } catch (error) {
-    if (error instanceof InvalidCredentialsError) {
+    if (error instanceof RateLimitBackendUnavailableError) {
+      log("error", "rate_limit_backend_unavailable", { requestId });
+      sendError(response, 503, "SERVICE_UNAVAILABLE", "Authentication service is temporarily unavailable", requestId);
+    } else if (error instanceof InvalidCredentialsError) {
       await authService.recordSecurityEvent({ eventType: "login", outcome: "failure", requestId }).catch(() => undefined);
       log("warn", "auth_login_failed", { requestId });
       sendError(response, 401, "UNAUTHENTICATED", "Invalid email or password", requestId);

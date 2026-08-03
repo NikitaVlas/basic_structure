@@ -80,8 +80,9 @@ for security/bugfix minor updates and test upgrades before changing the image.
 - Users can review and revoke owned sessions and see privacy-limited security
   events.
 
-The built-in rate limiter is process-local. Before horizontally scaling the API,
-replace it with a shared atomic store such as managed Valkey/Redis.
+The selectable rate-limit module supports process-local memory and atomic
+Valkey counters. Use Valkey before horizontally scaling the API; see
+`docs/development/distributed-rate-limiting.md`.
 
 ## Operations
 
@@ -95,8 +96,7 @@ replace it with a shared atomic store such as managed Valkey/Redis.
 
 ## Deferred capabilities
 
-Durable email outbox delivery, social login, MFA, breached-password screening,
-distributed rate limiting, account lockout policy, and automated browser E2E
+Social login, MFA, breached-password screening, account lockout policy, and automated browser E2E
 coverage remain explicit future capabilities. See
 `docs/development/account-security-operations.md` for setup and residual risks.
 

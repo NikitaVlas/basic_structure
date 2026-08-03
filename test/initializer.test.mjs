@@ -63,7 +63,7 @@ test("full-stack profile composes required modules and renders package names", a
     schemaVersion: 1,
     project: { name: "reference-saas", description: "Reference SaaS", profile: "fullstack-web" },
     surfaces: ["api", "webapp", "website"],
-    modules: ["shared-contracts", "observability", "database-postgres", "transactional-email", "auth-session"], adapters: [], verification: { required: true }
+    modules: ["shared-contracts", "observability", "database-postgres", "transactional-email", "rate-limit-valkey", "auth-session"], adapters: [], verification: { required: true }
   };
   try {
     await initializeProject(root, output, fullstackConfig);
@@ -85,12 +85,15 @@ test("full-stack profile composes required modules and renders package names", a
     assert.match(apiEnvironment, /APP_ORIGIN=/);
     assert.match(apiEnvironment, /EMAIL_TRANSPORT=console/);
     assert.match(apiEnvironment, /PUBLIC_APP_URL=/);
+    assert.match(apiEnvironment, /RATE_LIMIT_BACKEND=memory/);
+    assert.match(await readFile(path.join(output, "compose.rate-limit.yml"), "utf8"), /valkey\/valkey:9\.1\.1-alpine/);
     assert.match(await readFile(path.join(output, "compose.email.yml"), "utf8"), /axllent\/mailpit:v1\.30\.0/);
     assert.match(await readFile(path.join(output, "packages", "email", "src", "console.ts"), "utf8"), /transactional_email_captured/);
     const emailPackage = JSON.parse(await readFile(path.join(output, "packages", "email", "package.json"), "utf8"));
     assert.equal(emailPackage.dependencies.nodemailer, "^9.0.3");
     assert.equal(apiPackage.dependencies["@reference-saas/email"], "*");
     assert.match(rootPackage.scripts["email:worker"], /@reference-saas\/email/);
+    assert.match(rootPackage.scripts["rate-limit:up"], /compose\.rate-limit\.yml/);
     assert.match(await readFile(path.join(output, "apps", "api", "src", "server.ts"), "utf8"), /handleAuthRequest/);
     assert.match(await readFile(path.join(output, "packages", "auth", "src", "http.ts"), "utf8"), /password\/forgot/);
     assert.match(await readFile(path.join(output, "apps", "webapp", "src", "main.tsx"), "utf8"), /<AuthPanel \/>/);

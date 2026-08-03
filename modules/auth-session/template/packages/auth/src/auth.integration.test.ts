@@ -16,6 +16,9 @@ test("integration: registration, session, generic login failure, CSRF, and logou
   process.env.EMAIL_TRANSPORT = "console";
   process.env.EMAIL_OUTBOX_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
   process.env.IP_HASH_SECRET = "integration-test-secret-with-32-characters";
+  process.env.RATE_LIMIT_BACKEND = "memory";
+  process.env.RATE_LIMIT_KEY_SECRET = "rate-limit-integration-secret-32-characters";
+  process.env.RATE_LIMIT_NAMESPACE = "integration";
   const verificationPool = createDatabasePool({ max: 2 });
   await runMigrations(verificationPool);
   await verificationPool.query("TRUNCATE sessions, users RESTART IDENTITY CASCADE");
@@ -32,6 +35,9 @@ test("integration: registration, session, generic login failure, CSRF, and logou
   });
 
   try {
+    const rateLimitReadiness = await fetch(`${baseUrl}/api/v1/auth/rate-limit-ready`);
+    assert.equal(rateLimitReadiness.status, 200);
+    assert.deepEqual(await rateLimitReadiness.json(), { status: "ready" });
     const registration = await post("/api/v1/auth/register", { email: " User@Example.com ", password: "CorrectHorse7" });
     assert.equal(registration.status, 201);
     const cookie = registration.headers.get("set-cookie");
@@ -140,6 +146,33 @@ test("integration: registration, session, generic login failure, CSRF, and logou
   } finally {
     await closeAuthResources();
     await verificationPool.end();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("integration: authentication fails closed when Valkey is unavailable", { skip: !enabled }, async () => {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+  process.env.APP_ORIGIN = "http://localhost:5173";
+  process.env.RATE_LIMIT_BACKEND = "valkey";
+  process.env.RATE_LIMIT_KEY_SECRET = "rate-limit-integration-secret-32-characters";
+  process.env.RATE_LIMIT_NAMESPACE = "fail-closed";
+  process.env.VALKEY_URL = "redis://127.0.0.1:1";
+  const server = createServer(async (request, response) => {
+    if (!(await handleAuthRequest(request, response))) response.writeHead(404).end();
+  }).listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://localhost:5173" },
+      body: JSON.stringify({ email: "user@example.com", password: "CorrectHorse7" })
+    });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).error.code, "SERVICE_UNAVAILABLE");
+  } finally {
+    await closeAuthResources();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });

@@ -26,6 +26,8 @@ Current modules:
   and local Docker services;
 - `transactional-email` — typed account email templates, privacy-safe local
   capture, SMTP delivery, and a Mailpit development service;
+- `rate-limit-valkey` — shared memory and Valkey rate-limit adapters with
+  HMAC-pseudonymous keys and atomic distributed counters;
 - `auth-session` — secure cookie sessions, authentication API, and browser flow.
 
 Modules can contribute only through named profile slots and declarative

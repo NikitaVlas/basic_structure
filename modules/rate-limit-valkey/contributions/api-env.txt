@@ -1,0 +1,4 @@
+RATE_LIMIT_BACKEND=memory
+RATE_LIMIT_KEY_SECRET=replace-with-at-least-32-random-characters
+RATE_LIMIT_NAMESPACE=app
+VALKEY_URL=redis://127.0.0.1:56379
