@@ -1,0 +1,1 @@
+{"$schema":"../schemas/preset.schema.json","schemaVersion":1,"id":"saas","version":"1.0.0","name":"SaaS","description":"Authenticated observable SaaS runtime.","extends":["fullstack-minimal"],"profile":null,"modules":{"observability":"^1.0.0","database-postgres":"^1.0.0","transactional-email":"^1.0.0","rate-limit-valkey":"^1.0.0","auth-session":"^1.0.0"},"adapters":{}}

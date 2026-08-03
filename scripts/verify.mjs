@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspectDocumentation } from "./lib/documentation.mjs";
 import { loadExtension, pathExists, readJson, resolveConfiguration } from "./lib/configuration.mjs";
+import { configurationFromPreset, listPresets } from "./lib/presets.mjs";
 
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -36,17 +37,21 @@ try {
   }
 
   let extensions = 0;
+  let presets = 0;
   if (mode === "template") {
     extensions = await validateAllExtensions(starterRoot);
     const example = await readJson(path.join(starterRoot, "project.config.example.json"));
     await resolveConfiguration(starterRoot, example);
+    const catalog = await listPresets(starterRoot);
+    for (const preset of catalog) await configurationFromPreset(starterRoot, preset, { name: `${preset.id}-verify`, description: preset.description });
+    presets = catalog.length;
   } else {
     const configPath = path.join(root, "project.config.json");
     if (!(await pathExists(configPath))) throw new Error(`Missing generated project configuration: ${configPath}`);
     await resolveConfiguration(starterRoot, await readJson(configPath));
   }
 
-  console.log(`Verification passed (${documentation.filesChecked} docs, ${extensions} extensions, ${mode} mode).`);
+  console.log(`Verification passed (${documentation.filesChecked} docs, ${extensions} extensions, ${presets} presets, ${mode} mode).`);
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;

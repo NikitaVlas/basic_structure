@@ -87,6 +87,18 @@ destinations; validation and testing use the production resolver and generator.
 See [`extension authoring`](extension-authoring.md) for the scaffold contract and
 runtime-testing responsibilities.
 
+### Use presets
+
+```text
+node bin/basic-structure.mjs list-presets
+node bin/basic-structure.mjs init --preset saas --name example-saas --output ../example-saas
+node bin/basic-structure.mjs diff-preset production --project ../example-saas
+node bin/basic-structure.mjs apply-preset production --project ../example-saas --apply
+```
+
+Application is additive unless exact removal is explicitly acknowledged with
+`--prune`. See [`project presets`](presets.md).
+
 ### Diagnose
 
 ```text

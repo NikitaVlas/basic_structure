@@ -1,0 +1,1 @@
+{"$schema":"../schemas/preset.schema.json","schemaVersion":1,"id":"fullstack-complete","version":"1.0.0","name":"Full-stack complete","description":"Security-hardened production SaaS with Playwright journeys.","extends":["security-hardened"],"profile":null,"modules":{"e2e-playwright":"^1.0.0"},"adapters":{}}

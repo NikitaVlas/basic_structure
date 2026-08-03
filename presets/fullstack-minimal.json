@@ -1,0 +1,1 @@
+{"$schema":"../schemas/preset.schema.json","schemaVersion":1,"id":"fullstack-minimal","version":"1.0.0","name":"Full-stack minimal","description":"API, web application, website, and shared contracts.","extends":[],"profile":{"id":"fullstack-web","version":"^1.0.0"},"modules":{"shared-contracts":"^1.0.0"},"adapters":{}}

@@ -98,6 +98,32 @@ test("CLI extension authoring commands expose stable JSON evidence", async () =>
   }
 });
 
+test("CLI preset commands initialize diff and apply recipes", async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "basic-structure-cli-preset-"));
+  const output = path.join(temporaryRoot, "generated");
+  try {
+    let result = await invoke(["list-presets", "--json"]);
+    assert.equal(result.exitCode, 0);
+    assert.equal(JSON.parse(result.stdout).data.presets.length, 6);
+
+    result = await invoke(["init", "--preset", "documentation", "--name", "cli-preset", "--output", output, "--json"]);
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    assert.equal(JSON.parse(result.stdout).data.preset.id, "documentation");
+
+    result = await invoke(["diff-preset", "fullstack-minimal", "--project", output, "--json"]);
+    let envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    assert.equal(envelope.data.presetChange.mode, "additive");
+
+    result = await invoke(["apply-preset", "fullstack-minimal", "--project", output, "--apply", "--json"]);
+    envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    assert.ok(envelope.data.result.operationId);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test("CLI JSON validate and list commands expose versioned data", async () => {
   let result = await invoke(["validate", "--config", "project.config.fullstack.example.json", "--json"]);
   assert.equal(result.exitCode, 0);

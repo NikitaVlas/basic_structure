@@ -22,6 +22,9 @@ testable library functions and exposes these commands:
 - `create-extension`: atomically scaffold a local extension contract;
 - `validate-extension`: validate a manifest and selected integration fixture;
 - `test-extension`: run isolated generation and supported round-trip checks;
+- `list-presets`: resolve and list composable local recipes;
+- `diff-preset`: expose a read-only preset composition plan;
+- `apply-preset`: transactionally add or exactly converge a preset;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.

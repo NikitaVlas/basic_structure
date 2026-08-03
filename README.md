@@ -81,6 +81,17 @@ node bin/basic-structure.mjs test-extension module payments
 The full workflow is documented in
 [`extension authoring`](docs/development/extension-authoring.md).
 
+Composable project recipes reduce long extension selections to one reviewed
+preset:
+
+```text
+node bin/basic-structure.mjs init --preset saas --name example-saas --output ../example-saas
+node bin/basic-structure.mjs diff-preset production --project ../example-saas
+```
+
+See [`project presets`](docs/development/presets.md) before exact `--prune`
+convergence.
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

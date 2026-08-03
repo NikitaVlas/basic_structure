@@ -1,0 +1,1 @@
+{"$schema":"../schemas/preset.schema.json","schemaVersion":1,"id":"production","version":"1.0.0","name":"Production","description":"SaaS runtime with CI and production containers.","extends":["saas"],"profile":null,"modules":{},"adapters":{"github-ci":"^1.0.0","docker-production":"^1.0.0"}}

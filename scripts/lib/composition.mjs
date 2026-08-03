@@ -3,6 +3,7 @@ import path from "node:path";
 import { loadExtension, readJson, resolveConfiguration } from "./configuration.mjs";
 import { findUnfinishedUpgradeReports } from "./doctor.mjs";
 import { satisfiesSemver } from "./semver.mjs";
+import { configurationFromPreset } from "./presets.mjs";
 import { planProjectUpgrade } from "./upgrade.mjs";
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
@@ -203,5 +204,43 @@ export async function planProfileMigration(starterRoot, projectRoot, request) {
     surfaces: { before: currentConfig.surfaces, after: proposed.surfaces }
   };
   plan.compositionChange = { action: "switch-profile", requested: `profile:${targetId}`, automatic, before: { profile: currentConfig.project.profile, modules: currentConfig.modules, adapters: currentConfig.adapters }, after: { profile: targetId, modules: proposed.modules, adapters: proposed.adapters } };
+  return plan;
+}
+
+export async function planPresetApplication(starterRoot, projectRoot, request) {
+  const resolvedProject = path.resolve(projectRoot);
+  await assertCompositionReady(starterRoot, resolvedProject);
+  const currentConfig = await readJson(path.join(resolvedProject, "project.config.json"));
+  const exact = await configurationFromPreset(starterRoot, request.preset, currentConfig.project);
+  const proposed = request.prune ? exact : {
+    ...structuredClone(currentConfig),
+    project: { ...currentConfig.project, profile: exact.project.profile },
+    surfaces: exact.surfaces,
+    modules: [...new Set([...currentConfig.modules, ...exact.modules])],
+    adapters: [...new Set([...currentConfig.adapters, ...exact.adapters])]
+  };
+  const requested = new Set([`profile:${exact.project.profile}`, ...Object.keys(request.preset.modules).map((id) => `module:${id}`), ...Object.keys(request.preset.adapters).map((id) => `adapter:${id}`)]);
+  const automatic = [`profile:${exact.project.profile}`, ...exact.modules.map((id) => `module:${id}`), ...exact.adapters.map((id) => `adapter:${id}`)].filter((identity) => !requested.has(identity));
+
+  if (!request.prune && currentConfig.project.profile !== exact.project.profile) {
+    const current = await resolveConfiguration(starterRoot, currentConfig);
+    const targetProfile = await loadExtension(starterRoot, "profile", exact.project.profile);
+    const incompatible = findIncompatibleExtensions([...current.modules, ...current.adapters], targetProfile, await collectProfileSlots(path.join(targetProfile.root, targetProfile.manifest.files))).filter((identity) => !requested.has(identity));
+    if (incompatible.length) throw new CompositionError(`Preset requires pruning incompatible extensions: ${incompatible.join(", ")}.`, "PRESET_PRUNE_REQUIRED", 2, { preset: request.preset.id, incompatible });
+  }
+  await resolveConfiguration(starterRoot, proposed);
+  const plan = await planProjectUpgrade(starterRoot, resolvedProject, { config: proposed, acknowledgements: request.acknowledgements ?? [] });
+  const before = selectedIdentities(currentConfig);
+  const after = selectedIdentities(proposed);
+  plan.presetChange = {
+    id: request.preset.id,
+    version: request.preset.version,
+    lineage: request.preset.lineage,
+    mode: request.prune ? "exact" : "additive",
+    automatic,
+    added: [...after].filter((identity) => !before.has(identity)).sort(),
+    removed: [...before].filter((identity) => !after.has(identity)).sort()
+  };
+  plan.compositionChange = { action: "apply-preset", requested: `preset:${request.preset.id}`, automatic, before: { profile: currentConfig.project.profile, modules: currentConfig.modules, adapters: currentConfig.adapters }, after: { profile: proposed.project.profile, modules: proposed.modules, adapters: proposed.adapters } };
   return plan;
 }

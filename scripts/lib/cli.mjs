@@ -4,8 +4,9 @@ import { loadExtension, pathExists, readJson, resolveConfiguration } from "./con
 import { initializeProject } from "./initializer.mjs";
 import { applyProjectUpgrade, planProjectUpgrade, summarizeUpgradePlan } from "./upgrade.mjs";
 import { diagnoseProject } from "./doctor.mjs";
-import { planCompositionChange, planProfileMigration } from "./composition.mjs";
+import { planCompositionChange, planPresetApplication, planProfileMigration } from "./composition.mjs";
 import { createExtensionScaffold, testAuthoredExtension, validateAuthoredExtension } from "./extension-authoring.mjs";
+import { configurationFromPreset, listPresets, loadPreset } from "./presets.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -29,6 +30,9 @@ Commands:
   create-extension  Scaffold a local profile, module, or adapter
   validate-extension  Validate an extension manifest and fixture
   test-extension  Run isolated extension integration checks
+  list-presets  List resolved local project recipes
+  diff-preset  Preview a preset against a generated project
+  apply-preset  Plan or apply a preset composition
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -36,7 +40,7 @@ Global options:
   --help     Show help`;
 
 const COMMAND_HELP = {
-  init: "Usage: basic-structure init --config <file> --output <empty-directory> [--dry-run] [--json]",
+  init: "Usage: basic-structure init (--config <file> | --preset <id> --name <project>) --output <empty-directory> [--description <text>] [--dry-run] [--json]",
   validate: "Usage: basic-structure validate [--config <file>] [--json]",
   list: "Usage: basic-structure list [--kind profile|module|adapter] [--json]",
   update: "Usage: basic-structure update [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
@@ -46,6 +50,9 @@ const COMMAND_HELP = {
   "create-extension": "Usage: basic-structure create-extension <profile|module|adapter> <id> [--description <text>] [--json]",
   "validate-extension": "Usage: basic-structure validate-extension <profile|module|adapter> <id> [--json]",
   "test-extension": "Usage: basic-structure test-extension <profile|module|adapter> <id> [--json]",
+  "list-presets": "Usage: basic-structure list-presets [--json]",
+  "diff-preset": "Usage: basic-structure diff-preset <id> [--project <directory>] [--prune] [--json]",
+  "apply-preset": "Usage: basic-structure apply-preset <id> [--project <directory>] [--plan|--apply] [--prune] [--acknowledge-migration <qualified-id>] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -60,14 +67,20 @@ function rejectUnknown(argument) {
 }
 
 function parseInit(argv) {
-  const options = { config: "project.config.json", output: null, dryRun: false };
+  const options = { config: null, preset: null, name: null, description: null, output: null, dryRun: false };
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--config") options.config = takeValue(argv, index++, "--config");
+    else if (argv[index] === "--preset") options.preset = takeValue(argv, index++, "--preset");
+    else if (argv[index] === "--name") options.name = takeValue(argv, index++, "--name");
+    else if (argv[index] === "--description") options.description = takeValue(argv, index++, "--description");
     else if (argv[index] === "--output") options.output = takeValue(argv, index++, "--output");
     else if (argv[index] === "--dry-run") options.dryRun = true;
     else rejectUnknown(argv[index]);
   }
   if (!options.output) throw new CliError("--output is required.");
+  if (options.config && options.preset) throw new CliError("Choose either --config or --preset, not both.");
+  if (!options.config && !options.preset) options.config = "project.config.json";
+  if (options.preset && !options.name) throw new CliError("--name is required with --preset.");
   return options;
 }
 
@@ -137,6 +150,15 @@ function parseExtensionIdentity(argv, options = {}) {
   return { kind, id, description };
 }
 
+function parsePresetChange(argv, command) {
+  const id = argv.shift();
+  if (!id) throw new CliError(`${command} requires <id>.`);
+  const prune = argv.includes("--prune");
+  const options = parseUpdate(argv.filter((argument) => argument !== "--prune"));
+  if (command === "diff-preset" && options.apply) throw new CliError("diff-preset is plan-only.");
+  return { ...options, id, prune, apply: command === "diff-preset" ? false : options.apply };
+}
+
 async function listExtensions(starterRoot, kindFilter) {
   const result = [];
   for (const kind of ["profile", "module", "adapter"]) {
@@ -160,9 +182,10 @@ async function execute(command, argv, context) {
   const { starterRoot, cwd } = context;
   if (command === "init") {
     const options = parseInit(argv);
-    const config = await readJson(path.resolve(cwd, options.config));
+    const preset = options.preset ? await loadPreset(starterRoot, options.preset) : null;
+    const config = preset ? await configurationFromPreset(starterRoot, preset, { name: options.name, description: options.description ?? preset.description }) : await readJson(path.resolve(cwd, options.config));
     const plan = await initializeProject(starterRoot, path.resolve(cwd, options.output), config, { dryRun: options.dryRun });
-    const data = { project: config.project.name, outputRoot: plan.outputRoot, dryRun: options.dryRun, managedFiles: plan.files.length };
+    const data = { project: config.project.name, outputRoot: plan.outputRoot, dryRun: options.dryRun, managedFiles: plan.files.length, ...(preset ? { preset: { id: preset.id, version: preset.version, lineage: preset.lineage } } : {}) };
     return success(command, data, [`${options.dryRun ? "Planned" : "Initialized"} '${config.project.name}' at ${plan.outputRoot}.`, `Managed files: ${plan.files.length}`]);
   }
   if (command === "validate") {
@@ -232,6 +255,22 @@ async function execute(command, argv, context) {
     const data = await testAuthoredExtension(starterRoot, options.kind, options.id);
     return success(command, data, [`Tested ${data.identity}@${data.version}.`, `Managed files: ${data.managedFiles}`, `Round-trip: ${data.roundTrip}`]);
   }
+  if (command === "list-presets") {
+    if (argv.length) rejectUnknown(argv[0]);
+    const presets = await listPresets(starterRoot);
+    const data = { presets: presets.map(({ presetPath, ...preset }) => preset) };
+    return success(command, data, data.presets.map((preset) => `${preset.id}@${preset.version} — ${preset.description}`));
+  }
+  if (command === "diff-preset" || command === "apply-preset") {
+    const options = parsePresetChange(argv, command);
+    const preset = await loadPreset(starterRoot, options.id);
+    const plan = await planPresetApplication(starterRoot, path.resolve(cwd, options.project), { preset, prune: options.prune, acknowledgements: options.acknowledgements });
+    const data = { mode: options.apply ? "apply" : "plan", blocked: plan.blocked, presetChange: plan.presetChange, configChange: plan.configChange, fileSummary: summarizeUpgradePlan(plan), fileChanges: plan.changes, extensionChanges: plan.extensionChanges };
+    if (plan.blocked) throw new CliError("Preset application is blocked by file conflicts or migration requirements.", "PRESET_BLOCKED", 2, data);
+    if (options.apply) data.result = await applyProjectUpgrade(plan);
+    const lines = [`PRESET ${preset.id}@${preset.version} (${plan.presetChange.mode})`, ...plan.presetChange.added.map((identity) => `ADD ${identity}`), ...plan.presetChange.removed.map((identity) => `REMOVE ${identity}`), ...plan.presetChange.automatic.map((identity) => `REQUIRED ${identity}`), ...plan.changes.filter((entry) => entry.status !== "unchanged").map((entry) => `${entry.status.toUpperCase()} ${entry.path}`), options.apply ? `Applied preset ${data.result.operationId}.` : "Plan only; no project files or configuration were changed."];
+    return success(command, data, lines);
+  }
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");
     const diagnosis = await diagnoseProject(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });
@@ -286,7 +325,7 @@ export async function runCli(options) {
     if (json) stdout.write(`${JSON.stringify(envelope)}\n`);
     else {
       if (error.data?.checks) for (const entry of error.data.checks) stderr.write(`${entry.status.toUpperCase().padEnd(4)} ${entry.id}: ${entry.message}\n`);
-      if (error.code === "UPGRADE_BLOCKED" || error.code === "COMPOSITION_BLOCKED" || error.code === "PROFILE_MIGRATION_BLOCKED") {
+      if (error.code === "UPGRADE_BLOCKED" || error.code === "COMPOSITION_BLOCKED" || error.code === "PROFILE_MIGRATION_BLOCKED" || error.code === "PRESET_BLOCKED") {
         for (const entry of error.data.extensionChanges.filter((change) => change.status !== "unchanged")) {
           stderr.write(`${entry.status.toUpperCase()} ${entry.identity} ${entry.fromVersion ?? "none"} -> ${entry.toVersion ?? "none"}${entry.acknowledged ? "" : " — acknowledgement required"}\n`);
           for (const notice of entry.notices) stderr.write(`  Migration: ${notice.description}\n`);
