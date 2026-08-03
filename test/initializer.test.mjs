@@ -63,7 +63,7 @@ test("full-stack profile composes required modules and renders package names", a
     schemaVersion: 1,
     project: { name: "reference-saas", description: "Reference SaaS", profile: "fullstack-web" },
     surfaces: ["api", "webapp", "website"],
-    modules: ["shared-contracts", "observability", "database-postgres", "transactional-email", "rate-limit-valkey", "auth-session"], adapters: [], verification: { required: true }
+    modules: ["shared-contracts", "observability", "database-postgres", "transactional-email", "rate-limit-valkey", "auth-session", "e2e-playwright"], adapters: [], verification: { required: true }
   };
   try {
     await initializeProject(root, output, fullstackConfig);
@@ -94,6 +94,9 @@ test("full-stack profile composes required modules and renders package names", a
     assert.equal(apiPackage.dependencies["@reference-saas/email"], "*");
     assert.match(rootPackage.scripts["email:worker"], /@reference-saas\/email/);
     assert.match(rootPackage.scripts["rate-limit:up"], /compose\.rate-limit\.yml/);
+    assert.match(rootPackage.scripts["test:e2e"], /@reference-saas\/e2e/);
+    assert.match(await readFile(path.join(output, "apps", "e2e", "playwright.config.ts"), "utf8"), /retain-on-failure/);
+    assert.match(await readFile(path.join(output, ".github", "workflows", "e2e.yml"), "utf8"), /playwright install/);
     assert.match(await readFile(path.join(output, "apps", "api", "src", "server.ts"), "utf8"), /handleAuthRequest/);
     assert.match(await readFile(path.join(output, "packages", "auth", "src", "http.ts"), "utf8"), /password\/forgot/);
     assert.match(await readFile(path.join(output, "apps", "webapp", "src", "main.tsx"), "utf8"), /<AuthPanel \/>/);

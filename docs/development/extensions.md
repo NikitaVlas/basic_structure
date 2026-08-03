@@ -28,6 +28,8 @@ Current modules:
   capture, SMTP delivery, and a Mailpit development service;
 - `rate-limit-valkey` — shared memory and Valkey rate-limit adapters with
   HMAC-pseudonymous keys and atomic distributed counters;
+- `e2e-playwright` — isolated Chromium journeys across the webapp, API,
+  PostgreSQL, Valkey, email worker, and Mailpit;
 - `auth-session` — secure cookie sessions, authentication API, and browser flow.
 
 Modules can contribute only through named profile slots and declarative

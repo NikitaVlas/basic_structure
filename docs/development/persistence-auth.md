@@ -96,8 +96,8 @@ Valkey counters. Use Valkey before horizontally scaling the API; see
 
 ## Deferred capabilities
 
-Social login, MFA, breached-password screening, account lockout policy, and automated browser E2E
-coverage remain explicit future capabilities. See
+Social login, MFA, breached-password screening, account lockout policy, and
+broader cross-browser coverage remain explicit future capabilities. See
 `docs/development/account-security-operations.md` for setup and residual risks.
 
 ## Document status

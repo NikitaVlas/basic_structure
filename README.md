@@ -40,7 +40,7 @@ Available composition primitives are documented in
 - `project.config.fullstack.example.json` demonstrates the executable web
   profile with shared contracts, observability, PostgreSQL, encrypted durable transactional email,
   account recovery, distributed Valkey rate limiting, session management, Docker development services, and
-  GitHub CI.
+  isolated Playwright account-security journeys, and GitHub CI.
 - `schemas/project-config.schema.json` is the versioned configuration contract.
 
 Copy an example to `project.config.json`, record real product decisions, and
