@@ -32,6 +32,7 @@ testable library functions and exposes these commands:
 - `drift`: strictly compare managed state with the current starter;
 - `gate`: aggregate all read-only CI harness evidence;
 - `version`: expose package, schema, Node, and catalog digest provenance;
+- `catalog`: verify and manage immutable local bundle cache entries;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.

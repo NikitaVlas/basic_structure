@@ -126,6 +126,15 @@ npx basic-structure version --json
 
 See [`CLI installation`](docs/development/cli-installation.md).
 
+Verify and cache third-party local catalog bundles without activating them:
+
+```text
+basic-structure catalog verify ./vendor/catalog
+basic-structure catalog add ./vendor/catalog --project . --plan
+```
+
+See [`local catalog bundles`](docs/development/local-catalog-bundles.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

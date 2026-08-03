@@ -32,7 +32,7 @@ export async function getPackageProvenance(starterRoot) {
   return {
     package: { name: packageJson.name, version: packageJson.version },
     catalog: await calculateCatalogDigest(starterRoot),
-    schemas: { state: 3, extensionManifest: 2, projectConfig: 1, preset: 1, policy: 1 },
+    schemas: { state: 3, extensionManifest: 2, projectConfig: 1, preset: 1, policy: 1, catalogBundle: 1 },
     node: packageJson.engines.node
   };
 }

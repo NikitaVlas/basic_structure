@@ -11,6 +11,7 @@ import { inspectCatalogEntry, recommendCapabilities, searchCatalog } from "./cat
 import { checkProjectPolicies, listPolicies, loadPolicy } from "./policies.mjs";
 import { checkProjectDrift, checkProjectGate } from "./gates.mjs";
 import { getPackageProvenance } from "./provenance.mjs";
+import { inspectCatalogBundle, installCatalogBundle, listInstalledCatalogs, removeInstalledCatalog } from "./catalog-bundles.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -45,6 +46,7 @@ Commands:
   drift      Check generated project drift
   gate       Run or explain the unified read-only CI gate
   version    Show package and catalog provenance
+  catalog    Inspect, verify, add, list, or remove local bundles
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -73,6 +75,7 @@ const COMMAND_HELP = {
   drift: "Usage: basic-structure drift check [--project <directory>] [--json]",
   gate: "Usage: basic-structure gate <check|explain> [--project <directory>] [--json]",
   version: "Usage: basic-structure version [--json]",
+  catalog: "Usage: basic-structure catalog <inspect|verify|add|list|remove> [target] [--project <directory>] [--plan|--apply] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -379,6 +382,14 @@ async function execute(command, argv, context) {
     if (argv.length) rejectUnknown(argv[0]);
     const data = await getPackageProvenance(starterRoot);
     return success(command, data, [`${data.package.name}@${data.package.version}`, `Catalog: ${data.catalog.algorithm}:${data.catalog.digest} (${data.catalog.files} files)`, `Node: ${data.node}`]);
+  }
+  if (command === "catalog") {
+    const action = argv.shift();
+    if (action === "inspect" || action === "verify") { const target = argv.shift(); if (!target || argv.length) throw new CliError(`catalog ${action} requires <directory>.`); const data = await inspectCatalogBundle(starterRoot, path.resolve(cwd, target)); return success(command, { action, ...data }, [`VERIFIED ${data.publisher}/${data.id}@${data.version}`, `SHA256 ${data.digest}`, `Files: ${data.files}; identities: ${data.identities.length}`]); }
+    if (action === "list") { const project = parseSinglePath(argv, "--project", "."); const catalogs = await listInstalledCatalogs(path.resolve(cwd, project)); return success(command, { action, catalogs }, catalogs.map((item) => `${item.publisher}/${item.id}@${item.version}`)); }
+    if (action === "add") { const target = argv.shift(); if (!target) throw new CliError("catalog add requires <directory>."); const options = parseUpdate(argv); const data = await installCatalogBundle(starterRoot, path.resolve(cwd, options.project), path.resolve(cwd, target), options.apply); return success(command, { action, mode: options.apply ? "apply" : "plan", ...data }, [options.apply ? `INSTALLED ${data.publisher}/${data.id}@${data.version}` : `PLAN install ${data.publisher}/${data.id}@${data.version}`, `SHA256 ${data.digest}`]); }
+    if (action === "remove") { const identity = argv.shift(); const match = /^([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)@([0-9]+\.[0-9]+\.[0-9]+)$/.exec(identity ?? ""); if (!match) throw new CliError("catalog remove requires <publisher>/<id>@<version>."); const options = parseUpdate(argv); const data = await removeInstalledCatalog(path.resolve(cwd, options.project), match[1], match[2], match[3], options.apply); return success(command, { action, mode: options.apply ? "apply" : "plan", ...data }, [options.apply ? `REMOVED ${identity}` : `PLAN remove ${identity}`]); }
+    throw new CliError("catalog requires inspect, verify, add, list, or remove.");
   }
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");

@@ -141,6 +141,15 @@ npm run package:check
 
 See [`CLI installation`](cli-installation.md).
 
+### Verify local catalog bundles
+
+```text
+basic-structure catalog verify ./vendor/catalog
+basic-structure catalog add ./vendor/catalog --project . --plan
+```
+
+See [`local catalog bundles`](local-catalog-bundles.md).
+
 ### Diagnose
 
 ```text
