@@ -4,6 +4,15 @@ dist
 **/dist
 coverage
 .git
+.github
+.basic-structure
 .env
 **/.env
+.env.*
+!.env.production.example
+**/test-results
+**/playwright-report
+docs
+tasks
 work
+*.log

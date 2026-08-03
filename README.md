@@ -46,6 +46,13 @@ The observability baseline includes correlated JSON logs, safe error
 fingerprints, Prometheus-compatible API/worker metrics, liveness/readiness
 probes, and graceful service shutdown. Operational guidance is in
 [`docs/development/observability-operations.md`](docs/development/observability-operations.md).
+
+The optional `docker-production` adapter turns that runtime baseline into
+hardened API/worker and web images with private dependencies, migration gates,
+health checks, and CI smoke validation. It is governed by the
+[`AI engineering harness`](docs/architecture/ai-engineering-harness.md) and
+documented in
+[`production deployment`](docs/development/production-deployment.md).
 - `schemas/project-config.schema.json` is the versioned configuration contract.
 
 Copy an example to `project.config.json`, record real product decisions, and

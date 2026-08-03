@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/extension-manifest.schema.json",
+  "schemaVersion": 1,
+  "kind": "adapter",
+  "id": "docker-production",
+  "name": "Production Docker deployment",
+  "description": "Hardened API, worker, and webapp images with private dependencies, migrations, health checks, smoke validation, and rollback guidance.",
+  "files": "template",
+  "requires": ["profile:fullstack-web", "module:database-postgres", "module:observability", "module:transactional-email", "module:rate-limit-valkey", "module:auth-session"],
+  "conflicts": [],
+  "packageDependencies": {
+    "package.json": {
+      "scripts": {
+        "deployment:validate": "node scripts/validate-deployment.mjs",
+        "deployment:smoke": "node scripts/deployment-smoke.mjs"
+      },
+      "devDependencies": { "esbuild": "^0.28.1" }
+    }
+  }
+}

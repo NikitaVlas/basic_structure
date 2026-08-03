@@ -8,7 +8,7 @@
   },
   "surfaces": ["api", "webapp", "website"],
   "modules": ["shared-contracts", "observability", "database-postgres", "transactional-email", "rate-limit-valkey", "auth-session", "e2e-playwright"],
-  "adapters": ["github-ci"],
+  "adapters": ["github-ci", "docker-production"],
   "verification": {
     "required": true
   }

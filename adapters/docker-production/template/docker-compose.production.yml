@@ -1,0 +1,102 @@
+name: {{PROJECT_NAME}}-production
+
+x-runtime-security: &runtime-security
+  restart: unless-stopped
+  init: true
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  tmpfs: ["/tmp:size=16m,mode=1777"]
+  networks: [private]
+
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes: ["postgres-data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [private]
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?set VALKEY_PASSWORD}
+    command: ["sh", "-c", "exec valkey-server --save 60 1 --loglevel warning --requirepass \"$$VALKEY_PASSWORD\""]
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$$VALKEY_PASSWORD\" ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [private]
+
+  migrate:
+    image: ${APP_IMAGE:?set APP_IMAGE to an immutable tag}
+    command: ["node", "migrate.mjs"]
+    env_file: [.env.production]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [private]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    <<: *runtime-security
+    image: ${APP_IMAGE:?set APP_IMAGE to an immutable tag}
+    command: ["node", "api.mjs"]
+    env_file: [.env.production]
+    stop_grace_period: 30s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  worker:
+    <<: *runtime-security
+    image: ${APP_IMAGE:?set APP_IMAGE to an immutable tag}
+    command: ["node", "worker.mjs"]
+    env_file: [.env.production]
+    stop_grace_period: 30s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3001/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  web:
+    <<: *runtime-security
+    image: ${WEB_IMAGE:?set WEB_IMAGE to an immutable tag}
+    ports: ["127.0.0.1:${WEB_PORT:-8080}:8080"]
+    networks: [private, edge]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+networks:
+  private: { internal: true }
+  edge: {}
+
+volumes:
+  postgres-data:

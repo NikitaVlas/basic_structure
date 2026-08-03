@@ -46,6 +46,8 @@ making that platform part of the core architecture.
 Current adapters:
 
 - `github-ci` — GitHub Actions verification workflow.
+- `docker-production` — hardened production images, private service composition,
+  migration gates, proxy security headers, and deployment smoke checks.
 
 ## Manifest contract
 

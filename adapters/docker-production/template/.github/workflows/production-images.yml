@@ -1,0 +1,40 @@
+name: Production images
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run deployment:validate
+      - name: Build immutable test images
+        run: |
+          docker build -f Dockerfile.api-worker -t example/app:replace-with-immutable-tag .
+          docker build -f Dockerfile.webapp -t example/web:replace-with-immutable-tag .
+      - name: Start and smoke production composition
+        run: |
+          cp .env.production.example .env.production
+          docker compose --env-file .env.production -f docker-compose.production.yml up -d --wait
+          npm run deployment:smoke
+      - name: Collect diagnostics
+        if: failure()
+        run: docker compose --env-file .env.production -f docker-compose.production.yml logs --no-color > production-compose.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: production-compose-logs
+          path: production-compose.log
+          retention-days: 7
+      - name: Remove production smoke services
+        if: always()
+        run: docker compose --env-file .env.production -f docker-compose.production.yml down --volumes --remove-orphans
