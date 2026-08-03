@@ -144,6 +144,17 @@ basic-structure catalog verify ./vendor/catalog --project . --require-signature
 
 See [`catalog trust`](docs/development/catalog-trust.md).
 
+Activate an installed signed catalog for project-scoped trusted discovery:
+
+```text
+basic-structure catalog activate example-vendor/example-catalog@1.0.0 --project . --plan
+basic-structure catalog activate example-vendor/example-catalog@1.0.0 --project . --apply
+basic-structure catalog active --project .
+basic-structure search vendor-feature --project .
+```
+
+See [`trusted catalog activation`](docs/development/trusted-catalog-activation.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

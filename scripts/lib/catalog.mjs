@@ -2,6 +2,7 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { loadExtension, pathExists, resolveConfiguration } from "./configuration.mjs";
 import { configurationFromPreset, listPresets, loadPreset } from "./presets.mjs";
+import { resolveActiveCatalogs } from "./catalog-activation.mjs";
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 
@@ -9,14 +10,16 @@ export class CatalogError extends Error {
   constructor(message, code = "CATALOG_INVALID", exitCode = 1, data) { super(message); this.code = code; this.exitCode = exitCode; this.data = data; }
 }
 
-export async function listCatalogExtensions(starterRoot) {
+export async function listCatalogExtensions(starterRoot, options = {}) {
   const entries = [];
-  for (const kind of ["profile", "module", "adapter"]) {
-    const parent = path.join(starterRoot, `${kind}s`);
+  const roots = [{ root: starterRoot, provenance: { source: "built-in" } }];
+  if (options.projectRoot) for (const catalog of await resolveActiveCatalogs(starterRoot, options.projectRoot)) roots.push({ root: catalog.root, provenance: { source: "activated", publisher: catalog.publisher, catalog: catalog.id, catalogVersion: catalog.version, digest: catalog.digest, keyId: catalog.keyId, fingerprint: catalog.fingerprint, trust: catalog.trust } });
+  for (const catalogRoot of roots) for (const kind of ["profile", "module", "adapter"]) {
+    const parent = path.join(catalogRoot.root, `${kind}s`);
     if (!(await pathExists(parent))) continue;
     for (const item of await readdir(parent, { withFileTypes: true })) if (item.isDirectory()) {
-      const { manifest } = await loadExtension(starterRoot, kind, item.name);
-      entries.push({ type: "extension", identity: `${kind}:${manifest.id}`, kind, id: manifest.id, version: manifest.version, name: manifest.name, description: manifest.description, capabilities: manifest.capabilities ?? [], tags: manifest.tags ?? [], maturity: manifest.maturity ?? "experimental", requires: manifest.requires, conflicts: manifest.conflicts });
+      const { manifest } = await loadExtension(catalogRoot.root, kind, item.name);
+      entries.push({ type: "extension", identity: `${kind}:${manifest.id}`, kind, id: manifest.id, version: manifest.version, name: manifest.name, description: manifest.description, capabilities: manifest.capabilities ?? [], tags: manifest.tags ?? [], maturity: manifest.maturity ?? "experimental", requires: manifest.requires, conflicts: manifest.conflicts, provenance: catalogRoot.provenance });
     }
   }
   return entries.sort((a, b) => a.identity.localeCompare(b.identity));
@@ -37,21 +40,21 @@ async function enrichedPresets(starterRoot) {
 export async function searchCatalog(starterRoot, query, options = {}) {
   const needle = String(query ?? "").trim().toLowerCase();
   if (!needle) throw new CatalogError("Search query must be non-empty.");
-  const entries = [...await listCatalogExtensions(starterRoot), ...await enrichedPresets(starterRoot)];
+  const entries = [...await listCatalogExtensions(starterRoot, options), ...await enrichedPresets(starterRoot)];
   return entries.filter((entry) => (!options.kind || entry.type === options.kind || entry.kind === options.kind) && [entry.identity, entry.name, entry.description, ...entry.capabilities, ...entry.tags].some((value) => value.toLowerCase().includes(needle)));
 }
 
-export async function inspectCatalogEntry(starterRoot, kind, id) {
+export async function inspectCatalogEntry(starterRoot, kind, id, options = {}) {
   if (!ID_PATTERN.test(id ?? "")) throw new CatalogError("Catalog id must be lowercase kebab-case.");
   if (kind === "preset") return (await enrichedPresets(starterRoot)).find((entry) => entry.id === id) ?? Promise.reject(new CatalogError(`Unknown preset '${id}'.`, "CATALOG_NOT_FOUND"));
   if (!["profile", "module", "adapter"].includes(kind)) throw new CatalogError("Inspect kind must be profile, module, adapter, or preset.");
-  return (await listCatalogExtensions(starterRoot)).find((entry) => entry.kind === kind && entry.id === id) ?? Promise.reject(new CatalogError(`Unknown ${kind} '${id}'.`, "CATALOG_NOT_FOUND"));
+  return (await listCatalogExtensions(starterRoot, options)).find((entry) => entry.kind === kind && entry.id === id) ?? Promise.reject(new CatalogError(`Unknown ${kind} '${id}'.`, "CATALOG_NOT_FOUND"));
 }
 
 export async function recommendCapabilities(starterRoot, requested, options = {}) {
   const capabilities = [...new Set(requested)];
   if (!capabilities.length || capabilities.some((value) => !ID_PATTERN.test(value))) throw new CatalogError("At least one valid --capability is required.");
-  const extensions = await listCatalogExtensions(starterRoot);
+  const extensions = await listCatalogExtensions(starterRoot, options);
   const presets = await enrichedPresets(starterRoot);
   const presetMatches = presets.filter((preset) => (!options.profile || preset.profile.id === options.profile) && capabilities.every((capability) => preset.capabilities.includes(capability))).sort((a, b) => a.extensionCount - b.extensionCount || a.id.localeCompare(b.id));
   let profile = options.profile;
@@ -75,4 +78,3 @@ export async function recommendCapabilities(starterRoot, requested, options = {}
   } catch (error) { compositionError = error.message; }
   return { requested: capabilities, profile, covered: capabilities.filter((capability) => !uncovered.has(capability)), uncovered: [...uncovered], providers: selected.map((entry) => ({ identity: entry.identity, capabilities: entry.capabilities.filter((capability) => capabilities.includes(capability)), reason: `Provides ${entry.capabilities.filter((capability) => capabilities.includes(capability)).join(", ")}.` })), composition, compositionError, presetMatches: presetMatches.map(({ identity, version, description, extensionCount }) => ({ identity, version, description, extensionCount })) };
 }
-
