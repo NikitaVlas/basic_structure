@@ -8,6 +8,7 @@ import { planCompositionChange, planPresetApplication, planProfileMigration } fr
 import { createExtensionScaffold, testAuthoredExtension, validateAuthoredExtension } from "./extension-authoring.mjs";
 import { configurationFromPreset, listPresets, loadPreset } from "./presets.mjs";
 import { inspectCatalogEntry, recommendCapabilities, searchCatalog } from "./catalog.mjs";
+import { checkProjectPolicies, listPolicies, loadPolicy } from "./policies.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -38,6 +39,7 @@ Commands:
   inspect    Inspect a local extension
   inspect-preset  Inspect a resolved preset
   recommend  Recommend a compatible capability composition
+  policy     List, explain, check, or remediate harness policies
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -62,6 +64,7 @@ const COMMAND_HELP = {
   inspect: "Usage: basic-structure inspect <profile|module|adapter> <id> [--json]",
   "inspect-preset": "Usage: basic-structure inspect-preset <id> [--json]",
   recommend: "Usage: basic-structure recommend --capability <id> [--capability <id>...] [--profile <id>] [--json]",
+  policy: "Usage: basic-structure policy <list|explain|check|apply> [id] [--project <directory>] [--plan|--apply] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -317,6 +320,39 @@ async function execute(command, argv, context) {
     const lines = [`Profile: ${data.profile}`, ...data.providers.map((provider) => `SELECT ${provider.identity} — ${provider.reason}`), ...data.presetMatches.map((preset) => `PRESET ${preset.identity} (${preset.extensionCount} extensions)`), ...(data.uncovered.length ? [`UNCOVERED ${data.uncovered.join(", ")}`] : []), ...(data.compositionError ? [`INCOMPATIBLE ${data.compositionError}`] : [])];
     return success(command, data, lines);
   }
+  if (command === "policy") {
+    const action = argv.shift();
+    if (action === "list") {
+      if (argv.length) rejectUnknown(argv[0]);
+      const policies = await listPolicies(starterRoot);
+      return success(command, { action, policies }, policies.map((policy) => `${policy.id}@${policy.version} [${policy.severity}] — ${policy.description}`));
+    }
+    if (action === "explain") {
+      const id = argv.shift(); if (!id || argv.length) throw new CliError("policy explain requires <id>.");
+      const policy = await loadPolicy(starterRoot, id);
+      return success(command, { action, policy }, [`${policy.id}@${policy.version} [${policy.severity}]`, policy.description, `Requires capabilities: ${policy.requiresCapabilities.join(", ") || "none"}`, `Remediation preset: ${policy.remediationPreset}`]);
+    }
+    if (action === "check") {
+      let id = null; if (argv[0] && !argv[0].startsWith("--")) id = argv.shift();
+      const project = parseSinglePath(argv, "--project", ".");
+      const data = await checkProjectPolicies(starterRoot, path.resolve(cwd, project), { id });
+      if (!data.compliant) throw new CliError("Harness policy violations found.", "POLICY_VIOLATION", 4, data);
+      return success(command, { action, ...data }, data.results.map((result) => `${result.status.toUpperCase()} ${result.id}: ${result.message}`));
+    }
+    if (action === "apply") {
+      const id = argv.shift(); if (!id) throw new CliError("policy apply requires <id>.");
+      const options = parseUpdate(argv);
+      const policy = await loadPolicy(starterRoot, id);
+      const preset = await loadPreset(starterRoot, policy.remediationPreset);
+      const plan = await planPresetApplication(starterRoot, path.resolve(cwd, options.project), { preset, acknowledgements: options.acknowledgements });
+      plan.policyChange = { id: policy.id, remediationPreset: policy.remediationPreset };
+      const data = { action, mode: options.apply ? "apply" : "plan", policy: policy.id, remediationPreset: policy.remediationPreset, blocked: plan.blocked, presetChange: plan.presetChange, fileSummary: summarizeUpgradePlan(plan), fileChanges: plan.changes, extensionChanges: plan.extensionChanges };
+      if (plan.blocked) throw new CliError("Policy remediation is blocked.", "POLICY_REMEDIATION_BLOCKED", 2, data);
+      if (options.apply) data.result = await applyProjectUpgrade(plan);
+      return success(command, data, [`POLICY ${policy.id}`, `REMEDIATE preset:${policy.remediationPreset}`, options.apply ? `Applied remediation ${data.result.operationId}.` : "Plan only; no project files or configuration were changed."]);
+    }
+    throw new CliError("policy requires list, explain, check, or apply.");
+  }
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");
     const diagnosis = await diagnoseProject(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });
@@ -371,6 +407,7 @@ export async function runCli(options) {
     if (json) stdout.write(`${JSON.stringify(envelope)}\n`);
     else {
       if (error.data?.checks) for (const entry of error.data.checks) stderr.write(`${entry.status.toUpperCase().padEnd(4)} ${entry.id}: ${entry.message}\n`);
+      if (error.code === "POLICY_VIOLATION") for (const result of error.data.results) stderr.write(`${result.status.toUpperCase()} ${result.id}: ${result.message}\n`);
       if (error.code === "UPGRADE_BLOCKED" || error.code === "COMPOSITION_BLOCKED" || error.code === "PROFILE_MIGRATION_BLOCKED" || error.code === "PRESET_BLOCKED") {
         for (const entry of error.data.extensionChanges.filter((change) => change.status !== "unchanged")) {
           stderr.write(`${entry.status.toUpperCase()} ${entry.identity} ${entry.fromVersion ?? "none"} -> ${entry.toVersion ?? "none"}${entry.acknowledged ? "" : " — acknowledgement required"}\n`);

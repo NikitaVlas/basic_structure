@@ -101,6 +101,14 @@ node bin/basic-structure.mjs recommend --capability authentication --capability 
 
 See the [`capability catalog`](docs/development/capability-catalog.md).
 
+Evaluate declarative harness requirements with:
+
+```text
+node bin/basic-structure.mjs policy check --project ../example-saas
+```
+
+See [`harness policies`](docs/development/harness-policies.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

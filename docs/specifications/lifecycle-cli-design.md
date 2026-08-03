@@ -28,6 +28,7 @@ testable library functions and exposes these commands:
 - `search`: query local extension and preset metadata;
 - `inspect` and `inspect-preset`: expose exact catalog evidence;
 - `recommend`: derive a read-only capability composition and preset matches;
+- `policy`: list, explain, evaluate, and explicitly remediate harness rules;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.
@@ -56,6 +57,7 @@ Exit codes:
 - `1`: invalid arguments, invalid input, or unexpected operational failure;
 - `2`: update blocked by migration or file conflicts;
 - `3`: doctor completed and found a required failing check.
+- `4`: an applicable error-severity harness policy failed.
 
 ## Doctor contract
 

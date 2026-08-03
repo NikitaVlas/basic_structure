@@ -141,6 +141,23 @@ test("CLI capability catalog exposes search inspect and recommendation JSON", as
   assert.ok(envelope.data.composition.identities.includes("module:auth-session"));
 });
 
+test("CLI policy commands expose compliance and violation exit code", async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "basic-structure-cli-policy-"));
+  try {
+    const output = await initializeFixture(temporaryRoot);
+    let result = await invoke(["policy", "check", "--project", output, "--json"]);
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    assert.equal(JSON.parse(result.stdout).data.compliant, true);
+    await unlink(path.join(output, "AGENTS.md"));
+    result = await invoke(["policy", "check", "documentation-baseline", "--project", output, "--json"]);
+    const envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 4);
+    assert.equal(envelope.error.code, "POLICY_VIOLATION");
+    assert.deepEqual(envelope.data.results[0].missingFiles, ["AGENTS.md"]);
+  } finally { await rm(temporaryRoot, { recursive: true, force: true }); }
+});
+
+
 test("CLI JSON validate and list commands expose versioned data", async () => {
   let result = await invoke(["validate", "--config", "project.config.fullstack.example.json", "--json"]);
   assert.equal(result.exitCode, 0);

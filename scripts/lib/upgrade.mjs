@@ -238,6 +238,7 @@ function publicPlan(plan) {
     ...(plan.compositionChange ? { compositionChange: plan.compositionChange } : {}),
     ...(plan.profileMigration ? { profileMigration: plan.profileMigration } : {}),
     ...(plan.presetChange ? { presetChange: plan.presetChange } : {}),
+    ...(plan.policyChange ? { policyChange: plan.policyChange } : {}),
     changes: plan.changes,
     extensionChanges: plan.extensionChanges
   };

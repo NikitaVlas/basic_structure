@@ -111,6 +111,17 @@ node bin/basic-structure.mjs recommend --capability authentication --profile ful
 Discovery is local and read-only. See the
 [`capability catalog`](capability-catalog.md).
 
+### Enforce harness policies
+
+```text
+node bin/basic-structure.mjs policy list
+node bin/basic-structure.mjs policy check --project ../example-saas
+node bin/basic-structure.mjs policy apply production-readiness --project ../example-saas --plan
+```
+
+Policy violations use exit code `4`. See
+[`harness policies`](harness-policies.md).
+
 ### Diagnose
 
 ```text
