@@ -6,4 +6,7 @@ export { UserRepository } from "./users.js";
 export { SessionRepository } from "./sessions.js";
 export { AccountTokenRepository } from "./account-tokens.js";
 export { SecurityAuditRepository } from "./security-audit.js";
-export type { AccountTokenPurpose, AccountTokenRecord, Queryable, SecurityAuditEventRecord, SecurityAuditOutcome, SessionRecord, UserRecord, UserRole } from "./types.js";
+export { EmailOutboxRepository } from "./email-outbox.js";
+export { withDatabaseTransaction } from "./transaction.js";
+export type { EncryptedOutboxMessage } from "./email-outbox.js";
+export type { AccountTokenPurpose, AccountTokenRecord, EmailOutboxRecord, EmailOutboxStatus, Queryable, SecurityAuditEventRecord, SecurityAuditOutcome, SessionRecord, UserRecord, UserRole } from "./types.js";

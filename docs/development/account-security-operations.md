@@ -19,6 +19,20 @@ EMAIL_SMTP_PORT=1025
 EMAIL_SMTP_SECURE=false
 EMAIL_FROM=no-reply@example.test
 PUBLIC_APP_URL=http://localhost:5173
+EMAIL_OUTBOX_ENCRYPTION_KEY=<base64-encoded-32-byte-key>
+```
+
+Generate the outbox encryption key once per environment:
+
+```text
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
+```
+
+Apply migrations, then run the API and worker as separate processes:
+
+```text
+npm run db:migrate
+npm run email:worker
 ```
 
 Mailpit is available at `http://127.0.0.1:8025`. Stop it with
@@ -30,6 +44,9 @@ production mail relay.
 - Set `PUBLIC_APP_URL` to the canonical HTTPS application origin.
 - Set `APP_ORIGIN` to the exact browser origin allowed to mutate cookie state.
 - Generate an independent random `IP_HASH_SECRET` with at least 32 characters.
+- Generate and store an independent `EMAIL_OUTBOX_ENCRYPTION_KEY`. The API and
+  every worker replica must use the same key. Loss of the key makes pending
+  messages intentionally unreadable.
 - Configure authenticated SMTP credentials through the deployment secret
   manager; never commit them to `.env` or source control.
 - Set `NODE_ENV=production` so the API issues the Secure host-only cookie.
@@ -37,7 +54,8 @@ production mail relay.
 
 Run database migrations before shifting traffic. Migration
 `002_account_security.sql` adds verification state, one-time token digests,
-session metadata, and security audit events.
+session metadata, and security audit events. Migration
+`003_transactional_email_outbox.sql` adds encrypted durable email jobs.
 
 ## Security and privacy behavior
 
@@ -51,25 +69,33 @@ session metadata, and security audit events.
   `IP_HASH_SECRET`.
 - Public audit responses exclude request IDs, session IDs, metadata, emails,
   IP hashes, and token digests.
+- Account-token updates and encrypted outbox jobs commit in one transaction.
+- Concurrent workers claim with leases and `SKIP LOCKED`; stale workers cannot
+  acknowledge a job reclaimed by another process.
 
 ## Maintenance
 
 Schedule deletion of expired rows from `account_tokens` and `sessions` using
-the repository cleanup methods. Define and implement an audit-event retention
+the repository cleanup methods. Delete delivered and terminal failed outbox
+rows only after the chosen operational retention window. Define an audit-event retention
 period appropriate to product and regulatory requirements. Rotate
 `IP_HASH_SECRET` only with an explicit privacy/incident plan because rotation
 breaks correlation with earlier pseudonyms.
 
-Monitor email delivery failures, reset-request volume, repeated login failures,
-and unusual session revocation activity without adding sensitive values to
-logs. Back up and restore-test PostgreSQL before production use.
+Monitor counts and age grouped by outbox `status`, attempts approaching
+`EMAIL_WORKER_MAX_ATTEMPTS`, reset-request volume, repeated login failures, and
+unusual session revocation activity. Alert when pending jobs are older than the
+expected delivery objective or any job becomes terminally failed. Do not add
+recipients, ciphertext, payloads, or SMTP responses to logs. Back up and
+restore-test PostgreSQL before production use.
 
 ## Residual risks
 
-The starter sends email synchronously and does not yet include a durable outbox.
-A database write may succeed while SMTP delivery fails. Production systems
-that require guaranteed delivery should add a transactional outbox, background
-worker, retries with bounded backoff, and dead-letter visibility.
+Delivery is at-least-once. SMTP can accept a message immediately before a
+worker loses its lease or database connection, so recipients may receive a
+duplicate. Verification and reset tokens are single-use, but templates should
+remain duplicate-tolerant. Key rotation and re-encryption of pending jobs are
+not automated; rotate through an explicit migration procedure.
 
 The starter also does not include MFA, breached-password screening, distributed
 rate limiting, automated browser E2E tests, or a production email provider
@@ -80,4 +106,5 @@ adapter. Treat those as explicit deployment decisions, not implicit coverage.
 - Status: Active
 - Owner: Project maintainers
 - Last reviewed: 2026-08-03
-- Related specification: `docs/specifications/account-recovery-design.md`
+- Related specifications: `docs/specifications/account-recovery-design.md`,
+  `docs/specifications/transactional-email-outbox-design.md`

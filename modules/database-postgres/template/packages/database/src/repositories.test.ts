@@ -6,6 +6,7 @@ import type { Queryable } from "./types.js";
 import { UserRepository } from "./users.js";
 import { AccountTokenRepository } from "./account-tokens.js";
 import { SecurityAuditRepository } from "./security-audit.js";
+import { EmailOutboxRepository } from "./email-outbox.js";
 
 function recordingDatabase(rows: QueryResultRow[] = []) {
   const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
@@ -65,4 +66,27 @@ test("audit events use parameters and clamp list limits", async () => {
   await repository.listRecentForUser("user-id", 10_000);
   assert.match(calls[0]!.text, /VALUES \(\$1, \$2, \$3, \$4, \$5, \$6\)/);
   assert.deepEqual(calls[1]!.values, ["user-id", 100]);
+});
+
+test("outbox claim uses skip-locked leasing and clamps its batch", async () => {
+  const { calls, database } = recordingDatabase();
+  await new EmailOutboxRepository(database).claim({
+    leaseOwner: "018f22ec-8dc2-7d20-8000-000000000001",
+    limit: 1000,
+    now: new Date("2026-08-03T12:00:00Z"),
+    leaseMs: 30_000
+  });
+  assert.match(calls[0]!.text, /FOR UPDATE SKIP LOCKED/);
+  assert.match(calls[0]!.text, /lease_owner = \$3/);
+  assert.equal(calls[0]!.values?.[1], 100);
+});
+
+test("outbox acknowledgements require the active lease owner", async () => {
+  const { calls, database } = recordingDatabase();
+  const repository = new EmailOutboxRepository(database);
+  await repository.markDelivered("job-id", "lease-owner");
+  await repository.markFailed({ id: "job-id", leaseOwner: "lease-owner", attempts: 1, maxAttempts: 5, retryAt: new Date(), errorCategory: "smtp_unavailable" });
+  assert.match(calls[0]!.text, /id = \$1 AND lease_owner = \$2/);
+  assert.match(calls[1]!.text, /id = \$1 AND lease_owner = \$2/);
+  assert.equal(calls[1]!.values?.[2], "pending");
 });

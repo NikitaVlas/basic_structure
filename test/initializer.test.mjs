@@ -68,6 +68,7 @@ test("full-stack profile composes required modules and renders package names", a
   try {
     await initializeProject(root, output, fullstackConfig);
     const apiPackage = JSON.parse(await readFile(path.join(output, "apps", "api", "package.json"), "utf8"));
+    const rootPackage = JSON.parse(await readFile(path.join(output, "package.json"), "utf8"));
     assert.equal(apiPackage.name, "@reference-saas/api");
     assert.equal(apiPackage.dependencies["@reference-saas/contracts"], "*");
     const contractsPackage = JSON.parse(await readFile(path.join(output, "packages", "contracts", "package.json"), "utf8"));
@@ -77,6 +78,7 @@ test("full-stack profile composes required modules and renders package names", a
     assert.match(await readFile(path.join(output, "packages", "observability", "src", "index.ts"), "utf8"), /REDACTED/);
     assert.match(await readFile(path.join(output, "packages", "database", "migrations", "001_auth.sql"), "utf8"), /CREATE TABLE sessions/);
     assert.match(await readFile(path.join(output, "packages", "database", "migrations", "002_account_security.sql"), "utf8"), /CREATE TABLE account_tokens/);
+    assert.match(await readFile(path.join(output, "packages", "database", "migrations", "003_transactional_email_outbox.sql"), "utf8"), /CREATE TABLE transactional_email_outbox/);
     assert.match(await readFile(path.join(output, "docker-compose.yml"), "utf8"), /postgres:18\.4-alpine/);
     const apiEnvironment = await readFile(path.join(output, "apps", "api", ".env.example"), "utf8");
     assert.match(apiEnvironment, /DATABASE_URL=/);
@@ -88,6 +90,7 @@ test("full-stack profile composes required modules and renders package names", a
     const emailPackage = JSON.parse(await readFile(path.join(output, "packages", "email", "package.json"), "utf8"));
     assert.equal(emailPackage.dependencies.nodemailer, "^9.0.3");
     assert.equal(apiPackage.dependencies["@reference-saas/email"], "*");
+    assert.match(rootPackage.scripts["email:worker"], /@reference-saas\/email/);
     assert.match(await readFile(path.join(output, "apps", "api", "src", "server.ts"), "utf8"), /handleAuthRequest/);
     assert.match(await readFile(path.join(output, "packages", "auth", "src", "http.ts"), "utf8"), /password\/forgot/);
     assert.match(await readFile(path.join(output, "apps", "webapp", "src", "main.tsx"), "utf8"), /<AuthPanel \/>/);

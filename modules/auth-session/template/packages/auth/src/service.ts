@@ -1,6 +1,7 @@
 import type { AuthResponse, LoginRequest, PasswordResetRequest, RegisterRequest, SecurityEventDto, SessionDto, UserDto } from "@{{PROJECT_NAME}}/contracts";
-import type { AccountTokenRepository, SecurityAuditOutcome, SecurityAuditRepository, SessionRepository, UserRecord, UserRepository } from "@{{PROJECT_NAME}}/database";
-import { passwordResetEmail, verificationEmail, type EmailTransport } from "@{{PROJECT_NAME}}/email";
+import { AccountTokenRepository, EmailOutboxRepository, SessionRepository, UserRepository, withDatabaseTransaction, type SecurityAuditOutcome, type SecurityAuditRepository, type UserRecord } from "@{{PROJECT_NAME}}/database";
+import { passwordResetEmail, sealEmail, verificationEmail } from "@{{PROJECT_NAME}}/email";
+import type { Pool } from "pg";
 import { hashPassword, verifyPassword } from "./password.js";
 import { createOpaqueToken, createSessionToken, digestOpaqueToken, digestSessionToken } from "./session-token.js";
 
@@ -20,7 +21,7 @@ export class AuthService {
     private readonly sessions: SessionRepository,
     private readonly accountTokens: AccountTokenRepository,
     private readonly securityAudit: SecurityAuditRepository,
-    private readonly email: EmailTransport,
+    private readonly pool: Pool,
     private readonly sessionDurationMs = 7 * 24 * 60 * 60 * 1000
   ) {}
 
@@ -35,25 +36,51 @@ export class AuthService {
     return { response: { user: toUserDto(user) } satisfies AuthResponse, token, maxAgeSeconds: Math.floor(this.sessionDurationMs / 1000) };
   }
 
+  private sessionResult(user: Pick<UserRecord, "id" | "email_display" | "role" | "created_at" | "email_verified_at">, token: string) {
+    return { response: { user: toUserDto(user) } satisfies AuthResponse, token, maxAgeSeconds: Math.floor(this.sessionDurationMs / 1000) };
+  }
+
   private async issueAccountToken(user: Pick<UserRecord, "id" | "email_display">, purpose: "verify_email" | "reset_password") {
     const token = createOpaqueToken();
     const expiresInMs = purpose === "verify_email" ? 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
-    await this.accountTokens.issue({ userId: user.id, purpose, tokenDigest: digestOpaqueToken(token), expiresAt: new Date(Date.now() + expiresInMs) });
     const message = purpose === "verify_email"
       ? verificationEmail(user.email_display, token)
       : passwordResetEmail(user.email_display, token);
-    await this.email.send(message);
+    const encrypted = sealEmail(message);
+    await withDatabaseTransaction(this.pool, async (client) => {
+      await new AccountTokenRepository(client).issue({ userId: user.id, purpose, tokenDigest: digestOpaqueToken(token), expiresAt: new Date(Date.now() + expiresInMs) });
+      await new EmailOutboxRepository(client).enqueue({ template: message.template, message: encrypted });
+    });
   }
 
   async register(input: RegisterRequest, context?: { clientLabel: string; ipAddressHash: string }) {
     try {
-      const user = await this.users.create({
-        emailNormalized: input.email,
-        emailDisplay: input.email,
-        passwordHash: await hashPassword(input.password)
+      const verificationToken = createOpaqueToken();
+      const message = verificationEmail(input.email, verificationToken);
+      const encrypted = sealEmail(message);
+      const sessionToken = createSessionToken();
+      const passwordHash = await hashPassword(input.password);
+      return await withDatabaseTransaction(this.pool, async (client) => {
+        const user = await new UserRepository(client).create({
+          emailNormalized: input.email,
+          emailDisplay: input.email,
+          passwordHash
+        });
+        await new AccountTokenRepository(client).issue({
+          userId: user.id,
+          purpose: "verify_email",
+          tokenDigest: digestOpaqueToken(verificationToken),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+        });
+        await new EmailOutboxRepository(client).enqueue({ template: message.template, message: encrypted });
+        await new SessionRepository(client).create({
+          userId: user.id,
+          tokenDigest: digestSessionToken(sessionToken),
+          expiresAt: new Date(Date.now() + this.sessionDurationMs),
+          ...(context ? context : {})
+        });
+        return this.sessionResult(user, sessionToken);
       });
-      await this.issueAccountToken(user, "verify_email");
-      return await this.issueSession(user, context);
     } catch (error) {
       if (isUniqueViolation(error)) throw new EmailConflictError();
       throw error;

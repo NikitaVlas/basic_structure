@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
-import { createDatabasePool, runMigrations } from "@{{PROJECT_NAME}}/database";
+import { createDatabasePool, EmailOutboxRepository, runMigrations } from "@{{PROJECT_NAME}}/database";
+import { EmailOutboxWorker, type TransactionalEmail } from "@{{PROJECT_NAME}}/email";
 import { closeAuthResources, handleAuthRequest } from "./index.js";
 import { digestOpaqueToken } from "./session-token.js";
 
@@ -13,6 +14,7 @@ test("integration: registration, session, generic login failure, CSRF, and logou
   process.env.PUBLIC_APP_URL = "http://localhost:5173";
   process.env.EMAIL_FROM = "no-reply@example.test";
   process.env.EMAIL_TRANSPORT = "console";
+  process.env.EMAIL_OUTBOX_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
   process.env.IP_HASH_SECRET = "integration-test-secret-with-32-characters";
   const verificationPool = createDatabasePool({ max: 2 });
   await runMigrations(verificationPool);
@@ -44,6 +46,21 @@ test("integration: registration, session, generic login failure, CSRF, and logou
     assert.equal(stored.rows[0]!.token_digest.length, 64);
     assert.ok(!stored.rows[0]!.token_digest.includes(token));
     assert.ok(!stored.rows[0]!.password_hash.includes("CorrectHorse7"));
+
+    const captured: TransactionalEmail[] = [];
+    const worker = new EmailOutboxWorker(
+      new EmailOutboxRepository(verificationPool),
+      { async send(message) { captured.push(message); } },
+      { pollMs: 100, batchSize: 10, leaseMs: 5000, maxAttempts: 3, baseRetryMs: 100, maxRetryMs: 1000 }
+    );
+    assert.equal(await worker.runOnce(), 1);
+    assert.equal(captured[0]?.template, "verify-email");
+    assert.equal(captured[0]?.to, "user@example.com");
+    const delivered = await verificationPool.query<{ message_ciphertext: string; status: string }>(
+      "SELECT message_ciphertext, status FROM transactional_email_outbox ORDER BY created_at LIMIT 1"
+    );
+    assert.equal(delivered.rows[0]?.status, "delivered");
+    assert.doesNotMatch(delivered.rows[0]!.message_ciphertext, /user@example\.com/);
 
     const duplicate = await post("/api/v1/auth/register", { email: "user@example.com", password: "CorrectHorse7" });
     assert.equal(duplicate.status, 409);

@@ -38,7 +38,7 @@ Available composition primitives are documented in
 
 - `project.config.example.json` demonstrates a documentation-only project.
 - `project.config.fullstack.example.json` demonstrates the executable web
-  profile with shared contracts, observability, PostgreSQL, transactional email,
+  profile with shared contracts, observability, PostgreSQL, encrypted durable transactional email,
   account recovery, session management, Docker development services, and
   GitHub CI.
 - `schemas/project-config.schema.json` is the versioned configuration contract.

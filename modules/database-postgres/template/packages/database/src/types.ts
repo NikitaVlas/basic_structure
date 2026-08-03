@@ -44,3 +44,20 @@ export interface SecurityAuditEventRecord {
   metadata: Record<string, unknown>;
   occurred_at: Date;
 }
+export type EmailOutboxStatus = "pending" | "delivered" | "failed";
+export interface EmailOutboxRecord {
+  id: string;
+  template: "verify-email" | "reset-password";
+  message_ciphertext: string;
+  message_nonce: string;
+  message_auth_tag: string;
+  status: EmailOutboxStatus;
+  attempts: number;
+  available_at: Date;
+  lease_owner: string | null;
+  leased_until: Date | null;
+  delivered_at: Date | null;
+  last_error_category: string | null;
+  created_at: Date;
+  updated_at: Date;
+}

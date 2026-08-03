@@ -2,7 +2,6 @@ import { createHmac, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { apiError, emailRequestSchema, loginRequestSchema, passwordResetRequestSchema, registerRequestSchema, tokenRequestSchema, type ApiErrorCode } from "@{{PROJECT_NAME}}/contracts";
 import { AccountTokenRepository, createDatabasePool, SecurityAuditRepository, SessionRepository, UserRepository } from "@{{PROJECT_NAME}}/database";
-import { createEmailTransport } from "@{{PROJECT_NAME}}/email";
 import type { Pool } from "pg";
 import { log } from "@{{PROJECT_NAME}}/observability";
 import { clearSessionCookie, createSessionCookie, readSessionCookie } from "./cookies.js";
@@ -22,7 +21,7 @@ function getService() {
       new SessionRepository(pool),
       new AccountTokenRepository(pool),
       new SecurityAuditRepository(pool),
-      createEmailTransport(),
+      pool,
       durationDays * 24 * 60 * 60 * 1000
     );
   }
