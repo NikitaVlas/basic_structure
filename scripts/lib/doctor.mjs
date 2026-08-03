@@ -21,7 +21,7 @@ async function assertRegularFile(filePath, label) {
   if (info.isSymbolicLink() || !info.isFile()) throw new Error(`${label} must be a regular non-symbolic-link file.`);
 }
 
-async function inspectReports(projectRoot) {
+export async function findUnfinishedUpgradeReports(projectRoot) {
   const reportsRoot = path.join(projectRoot, ".basic-structure", "reports");
   if (!(await pathExists(reportsRoot))) return [];
   const info = await lstat(reportsRoot);
@@ -100,7 +100,7 @@ export async function diagnoseProject(starterRoot, projectRoot, options = {}) {
   }
 
   try {
-    const unfinished = await inspectReports(resolvedProject);
+    const unfinished = await findUnfinishedUpgradeReports(resolvedProject);
     checks.push(check("upgrade-reports", unfinished.length ? "fail" : "pass", true, unfinished.length ? `${unfinished.length} unfinished upgrade report(s) require review.` : "No unfinished upgrade reports.", unfinished));
   } catch (error) {
     checks.push(check("upgrade-reports", "fail", true, error.message));

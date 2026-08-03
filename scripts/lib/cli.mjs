@@ -4,6 +4,7 @@ import { loadExtension, pathExists, readJson, resolveConfiguration } from "./con
 import { initializeProject } from "./initializer.mjs";
 import { applyProjectUpgrade, planProjectUpgrade, summarizeUpgradePlan } from "./upgrade.mjs";
 import { diagnoseProject } from "./doctor.mjs";
+import { planCompositionChange } from "./composition.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -21,6 +22,8 @@ Commands:
   validate   Validate configuration and compatibility
   list       List local profiles, modules, and adapters
   update     Plan or apply a safe project upgrade
+  add        Add a module or adapter with required dependencies
+  remove     Remove an unreferenced module or adapter
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -32,6 +35,8 @@ const COMMAND_HELP = {
   validate: "Usage: basic-structure validate [--config <file>] [--json]",
   list: "Usage: basic-structure list [--kind profile|module|adapter] [--json]",
   update: "Usage: basic-structure update [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
+  add: "Usage: basic-structure add <module|adapter> <id> [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
+  remove: "Usage: basic-structure remove <module|adapter> <id> [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -95,6 +100,14 @@ function parseUpdate(argv) {
   return options;
 }
 
+function parseComposition(argv) {
+  const kind = argv.shift();
+  const id = argv.shift();
+  if (!kind || !id) throw new CliError("Composition command requires <module|adapter> <id>.");
+  const options = parseUpdate(argv);
+  return { ...options, kind, id };
+}
+
 async function listExtensions(starterRoot, kindFilter) {
   const result = [];
   for (const kind of ["profile", "module", "adapter"]) {
@@ -142,6 +155,21 @@ async function execute(command, argv, context) {
     if (plan.blocked) throw new CliError("Upgrade is blocked by file conflicts or migration requirements.", "UPGRADE_BLOCKED", 2, data);
     if (options.apply) data.result = await applyProjectUpgrade(plan);
     const lines = [...plan.extensionChanges.filter((entry) => entry.status !== "unchanged").map((entry) => `${entry.status.toUpperCase()} ${entry.identity} ${entry.fromVersion ?? "none"} -> ${entry.toVersion ?? "none"}`), ...plan.changes.filter((entry) => entry.status !== "unchanged").map((entry) => `${entry.status.toUpperCase()} ${entry.path}`), options.apply ? `Applied upgrade ${data.result.operationId}.` : "Plan only; no project files were changed."];
+    return success(command, data, lines);
+  }
+  if (command === "add" || command === "remove") {
+    const options = parseComposition(argv);
+    const plan = await planCompositionChange(starterRoot, path.resolve(cwd, options.project), { action: command, kind: options.kind, id: options.id, acknowledgements: options.acknowledgements });
+    const data = { mode: options.apply ? "apply" : "plan", blocked: plan.blocked, compositionChange: plan.compositionChange, configChange: plan.configChange, fileSummary: summarizeUpgradePlan(plan), fileChanges: plan.changes, extensionChanges: plan.extensionChanges };
+    if (plan.blocked) throw new CliError("Composition change is blocked by file conflicts or migration requirements.", "COMPOSITION_BLOCKED", 2, data);
+    if (options.apply) data.result = await applyProjectUpgrade(plan);
+    const lines = [
+      `${command.toUpperCase()} ${plan.compositionChange.requested}`,
+      ...plan.compositionChange.automatic.map((identity) => `REQUIRED ${identity}`),
+      ...plan.extensionChanges.filter((entry) => entry.status !== "unchanged").map((entry) => `${entry.status.toUpperCase()} ${entry.identity}`),
+      ...plan.changes.filter((entry) => entry.status !== "unchanged").map((entry) => `${entry.status.toUpperCase()} ${entry.path}`),
+      options.apply ? `Applied composition change ${data.result.operationId}.` : "Plan only; no project files or configuration were changed."
+    ];
     return success(command, data, lines);
   }
   if (command === "doctor") {
@@ -198,7 +226,7 @@ export async function runCli(options) {
     if (json) stdout.write(`${JSON.stringify(envelope)}\n`);
     else {
       if (error.data?.checks) for (const entry of error.data.checks) stderr.write(`${entry.status.toUpperCase().padEnd(4)} ${entry.id}: ${entry.message}\n`);
-      if (error.code === "UPGRADE_BLOCKED") {
+      if (error.code === "UPGRADE_BLOCKED" || error.code === "COMPOSITION_BLOCKED") {
         for (const entry of error.data.extensionChanges.filter((change) => change.status !== "unchanged")) {
           stderr.write(`${entry.status.toUpperCase()} ${entry.identity} ${entry.fromVersion ?? "none"} -> ${entry.toVersion ?? "none"}${entry.acknowledged ? "" : " — acknowledgement required"}\n`);
           for (const notice of entry.notices) stderr.write(`  Migration: ${notice.description}\n`);

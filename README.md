@@ -41,6 +41,16 @@ replaced or retired files, and records an operation report. See
 The complete command and JSON contract is documented in the
 [`lifecycle CLI guide`](docs/development/lifecycle-cli.md).
 
+Existing projects can add or remove modules and adapters through a plan-first,
+dependency-aware composition workflow:
+
+```text
+node bin/basic-structure.mjs add module observability --project ../example-saas --plan
+node bin/basic-structure.mjs remove adapter github-ci --project ../example-saas --plan
+```
+
+See [`composition changes`](docs/development/composition-changes.md).
+
 The initializer never overwrites a non-empty output directory. Generated files,
 their owning extensions, exact extension versions, and SHA-256 baselines are recorded in
 `.basic-structure/state.json`.

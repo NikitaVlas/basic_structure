@@ -114,7 +114,10 @@ function classifyExtensionChanges(previousState, desired, acknowledgements) {
   return identities.map((identity) => {
     const fromVersion = previousVersions[identity] ?? null;
     const toVersion = desiredVersions[identity] ?? null;
-    if (!fromVersion) return { identity, fromVersion, toVersion, status: "baseline-adoption", acknowledged: true, notices: [], reason: "Previous state did not record this extension version." };
+    if (!fromVersion) {
+      const added = previousState.schemaVersion === 3;
+      return { identity, fromVersion, toVersion, status: added ? "added" : "baseline-adoption", acknowledged: true, notices: [], reason: added ? "Extension is newly selected." : "Previous state did not record this extension version." };
+    }
     if (!toVersion) return { identity, fromVersion, toVersion, status: "removed", acknowledged: true, notices: [], reason: "Extension is no longer selected." };
     const comparison = compareSemver(toVersion, fromVersion);
     if (comparison === 0) return { identity, fromVersion, toVersion, status: "unchanged", acknowledged: true, notices: [], reason: "Extension version is unchanged." };
@@ -145,9 +148,12 @@ export async function planProjectUpgrade(starterRoot, projectRoot, options = {})
   await assertNoSymlinkTraversal(resolvedProject, ".basic-structure/state.json");
   await Promise.all([assertControlFile(statePath, "Generated state"), assertControlFile(configPath, "Project configuration")]);
 
-  const [previousState, config] = await Promise.all([readJson(statePath), readJson(configPath)]);
+  const [previousState, currentConfig, previousConfigContent] = await Promise.all([readJson(statePath), readJson(configPath), readFile(configPath)]);
   validateState(previousState);
-  const desired = await renderDesired(starterRoot, config);
+  const desiredConfig = options.config ?? currentConfig;
+  const configChanged = JSON.stringify(currentConfig) !== JSON.stringify(desiredConfig);
+  const desiredConfigContent = Buffer.from(`${JSON.stringify(desiredConfig, null, 2)}\n`, "utf8");
+  const desired = await renderDesired(starterRoot, desiredConfig);
   validateState(desired.state);
   const extensionChanges = classifyExtensionChanges(previousState, desired, options.acknowledgements ?? []);
 
@@ -209,9 +215,16 @@ export async function planProjectUpgrade(starterRoot, projectRoot, options = {})
     blocked: changes.some((change) => BLOCKING_STATUSES.has(change.status)) || extensionChanges.some((change) => change.status === "downgrade-blocked" || !change.acknowledged),
     changes,
     extensionChanges,
+    configChange: {
+      changed: configChanged,
+      before: { profile: currentConfig.project.profile, modules: currentConfig.modules, adapters: currentConfig.adapters },
+      after: { profile: desiredConfig.project.profile, modules: desiredConfig.modules, adapters: desiredConfig.adapters }
+    },
     desiredState: desired.state,
     desiredFiles: desired.files,
-    previousStateContent: await readFile(statePath)
+    desiredConfigContent,
+    previousStateContent: await readFile(statePath),
+    previousConfigContent
   };
 }
 
@@ -221,6 +234,8 @@ function publicPlan(plan) {
     previousSchemaVersion: plan.previousSchemaVersion,
     targetSchemaVersion: plan.targetSchemaVersion,
     blocked: plan.blocked,
+    configChange: plan.configChange,
+    ...(plan.compositionChange ? { compositionChange: plan.compositionChange } : {}),
     changes: plan.changes,
     extensionChanges: plan.extensionChanges
   };
@@ -238,7 +253,14 @@ export async function applyProjectUpgrade(plan) {
 
   const backedUp = [];
   const created = [];
+  let configBackedUp = false;
   try {
+    if (plan.configChange.changed) {
+      const configBackup = path.join(backupRoot, "project.config.json");
+      await mkdir(path.dirname(configBackup), { recursive: true });
+      await copyFile(path.join(plan.projectRoot, "project.config.json"), configBackup);
+      configBackedUp = true;
+    }
     for (const change of actionable.filter((entry) => entry.status !== "new")) {
       await assertNoSymlinkTraversal(plan.projectRoot, change.path);
       const source = path.join(plan.projectRoot, ...change.path.split("/"));
@@ -262,14 +284,16 @@ export async function applyProjectUpgrade(plan) {
     }
 
     const state = { ...plan.desiredState, updatedAt: new Date().toISOString() };
-    const report = { schemaVersion: 1, operationId, status: "prepared", createdAt: new Date().toISOString(), backupRoot: backedUp.length ? path.relative(plan.projectRoot, backupRoot).split(path.sep).join("/") : null, plan: publicPlan(plan) };
+    const hasBackup = backedUp.length > 0 || configBackedUp;
+    const report = { schemaVersion: 1, operationId, status: "prepared", createdAt: new Date().toISOString(), backupRoot: hasBackup ? path.relative(plan.projectRoot, backupRoot).split(path.sep).join("/") : null, plan: publicPlan(plan) };
     const reportPath = path.join(reportRoot, `${operationId}.json`);
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+    if (plan.configChange.changed) await writeFile(path.join(plan.projectRoot, "project.config.json"), plan.desiredConfigContent);
     await writeFile(path.join(controlRoot, "state.json"), `${JSON.stringify(state, null, 2)}\n`, "utf8");
     report.status = "applied";
     report.completedAt = new Date().toISOString();
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
-    return { operationId, backupRoot: backedUp.length ? backupRoot : null, reportPath, changes: actionable };
+    return { operationId, backupRoot: hasBackup ? backupRoot : null, reportPath, changes: actionable, configChanged: plan.configChange.changed };
   } catch (error) {
     for (const relative of created.reverse()) await rm(path.join(plan.projectRoot, ...relative.split("/")), { force: true });
     for (const relative of backedUp.reverse()) {
@@ -278,6 +302,7 @@ export async function applyProjectUpgrade(plan) {
       await mkdir(path.dirname(destination), { recursive: true });
       await copyFile(source, destination);
     }
+    if (configBackedUp) await writeFile(path.join(plan.projectRoot, "project.config.json"), plan.previousConfigContent);
     await writeFile(path.join(controlRoot, "state.json"), plan.previousStateContent);
     throw new Error(`Upgrade failed and file changes were rolled back: ${error.message}`);
   }

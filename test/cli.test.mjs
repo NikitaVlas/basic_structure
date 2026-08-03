@@ -100,6 +100,36 @@ test("CLI update reports clean plans and blocked state with exit code 2", async 
   }
 });
 
+test("CLI add and remove preserve plan-first composition behavior", async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "basic-structure-cli-"));
+  try {
+    const output = await initializeFixture(temporaryRoot);
+    const configPath = path.join(output, "project.config.json");
+    const before = await readFile(configPath, "utf8");
+    let result = await invoke(["add", "adapter", "github-ci", "--project", output, "--plan", "--json"]);
+    let envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 0);
+    assert.equal(envelope.data.compositionChange.requested, "adapter:github-ci");
+    assert.equal(await readFile(configPath, "utf8"), before);
+
+    result = await invoke(["add", "adapter", "github-ci", "--project", output, "--apply", "--json"]);
+    envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 0);
+    assert.equal(JSON.parse(await readFile(configPath, "utf8")).adapters.includes("github-ci"), true);
+    assert.match(await readFile(path.join(output, ".github", "workflows", "verify.yml"), "utf8"), /npm run verify/);
+
+    result = await invoke(["remove", "adapter", "github-ci", "--project", output, "--plan", "--json"]);
+    assert.equal(result.exitCode, 0);
+    assert.equal(JSON.parse(result.stdout).data.fileSummary["safe-delete"] > 0, true);
+    result = await invoke(["remove", "adapter", "github-ci", "--project", output, "--apply", "--json"]);
+    assert.equal(result.exitCode, 0);
+    assert.equal(JSON.parse(await readFile(configPath, "utf8")).adapters.includes("github-ci"), false);
+    await assert.rejects(() => readFile(path.join(output, ".github", "workflows", "verify.yml")), /ENOENT/);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test("doctor requires Docker only when the production adapter is selected", async () => {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "basic-structure-cli-"));
   try {
