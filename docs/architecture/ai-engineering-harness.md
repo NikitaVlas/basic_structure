@@ -26,7 +26,8 @@ The harness owns:
 - architectural and security specifications before implementation;
 - incremental work with reviewable commit suggestions;
 - tests, documentation checks, security audits, builds, and smoke evidence;
-- handoff of residual risks and operator procedures.
+- handoff of residual risks and operator procedures;
+- safe lifecycle upgrades with plan-first conflict detection and verification.
 
 Profiles own application shape, modules own portable capabilities, and adapters
 own platform-specific integration. Docker production deployment is therefore an

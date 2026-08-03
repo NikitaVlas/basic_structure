@@ -10,6 +10,7 @@
     "config:check": "node scripts/validate-config.mjs",
     "docs:check": "node scripts/check-docs.mjs --mode template",
     "init": "node scripts/init-project.mjs",
+    "update": "node scripts/update-project.mjs",
     "test": "node --test test/*.test.mjs",
     "verify": "node scripts/verify.mjs --mode template"
   }

@@ -1,6 +1,7 @@
 import { cp, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathExists, resolveConfiguration } from "./configuration.mjs";
+import { hashGeneratedContent } from "./content-hash.mjs";
 
 const CORE_ENTRIES = [
   "AGENTS.md",
@@ -27,6 +28,10 @@ function render(value, config) {
   return value
     .replaceAll("{{PROJECT_NAME}}", config.project.name)
     .replaceAll("{{PROJECT_DESCRIPTION}}", config.project.description);
+}
+
+async function hashFile(filePath, relative) {
+  return hashGeneratedContent(await readFile(filePath), relative);
 }
 
 async function assertSafeOutput(starterRoot, outputRoot) {
@@ -155,13 +160,21 @@ export async function initializeProject(starterRoot, outputRoot, config, options
   const stateRoot = path.join(plan.outputRoot, ".basic-structure");
   await mkdir(stateRoot, { recursive: true });
   await writeFile(path.join(plan.outputRoot, "project.config.json"), `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  const starterPackage = JSON.parse(await readFile(path.join(starterRoot, "package.json"), "utf8"));
+  const generatedFiles = await Promise.all(plan.files.map(async ({ relative, owner }) => ({
+    path: relative,
+    owner,
+    hashAlgorithm: "sha256",
+    hash: await hashFile(path.join(plan.outputRoot, relative), relative)
+  })));
   await writeFile(path.join(stateRoot, "state.json"), `${JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
+    starterVersion: starterPackage.version,
     generatedAt: new Date().toISOString(),
     profile: config.project.profile,
     modules: config.modules,
     adapters: config.adapters,
-    generatedFiles: plan.files.map(({ relative, owner }) => ({ path: relative, owner }))
+    generatedFiles
   }, null, 2)}\n`, "utf8");
   return plan;
 }

@@ -23,8 +23,9 @@ test("initializer creates core documentation and state", async () => {
     const generatedConfig = JSON.parse(await readFile(path.join(output, "project.config.json"), "utf8"));
     assert.equal(generatedConfig.project.name, "generated-project");
     const state = JSON.parse(await readFile(path.join(output, ".basic-structure", "state.json"), "utf8"));
+    assert.equal(state.schemaVersion, 2);
     assert.equal(state.profile, "documentation-only");
-    assert.ok(state.generatedFiles.some((file) => file.path === "AGENTS.md"));
+    assert.ok(state.generatedFiles.some((file) => file.path === "AGENTS.md" && /^[a-f0-9]{64}$/.test(file.hash)));
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

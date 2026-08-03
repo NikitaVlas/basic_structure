@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/basic-structure/project-state.schema.json",
+  "title": "Basic Structure generated project state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "starterVersion", "generatedAt", "profile", "modules", "adapters", "generatedFiles"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "starterVersion": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "profile": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "modules": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "uniqueItems": true },
+    "adapters": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "uniqueItems": true },
+    "generatedFiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "owner", "hashAlgorithm", "hash"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "hashAlgorithm": { "const": "sha256" },
+          "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}
+

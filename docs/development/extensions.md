@@ -58,6 +58,12 @@ Every extension has a versioned manifest validated against
 the generated repository. Generation stops on unknown extensions, unmet
 requirements, declared conflicts, or file collisions.
 
+After composition, the initializer records each generated file's extension
+owner and SHA-256 baseline in `.basic-structure/state.json`. The upgrade engine
+uses those baselines to update unmodified extension output while preserving
+user-only edits. Removing or renaming extension files therefore participates in
+the same conflict and backup policy as changing them.
+
 Use `{{PROJECT_NAME}}` and `{{PROJECT_DESCRIPTION}}` in text templates. The
 initializer renders these values without executing template code.
 
@@ -75,4 +81,4 @@ initializer renders these values without executing template code.
 - Status: Active
 - Owner: Project maintainers
 - Last reviewed: 2026-08-03
-- Related code: `scripts/lib/configuration.mjs`, `scripts/lib/initializer.mjs`
+- Related code: `scripts/lib/configuration.mjs`, `scripts/lib/initializer.mjs`, `scripts/lib/upgrade.mjs`

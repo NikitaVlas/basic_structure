@@ -28,8 +28,20 @@ Generate it into a new or empty directory:
 node scripts/init-project.mjs --config project.config.fullstack.example.json --output ../example-saas
 ```
 
-The initializer never overwrites a non-empty output directory. Generated files
-and their owning extensions are recorded in `.basic-structure/state.json`.
+Preview and apply starter updates to an existing generated project:
+
+```text
+node scripts/update-project.mjs --project ../example-saas --plan
+node scripts/update-project.mjs --project ../example-saas --apply
+```
+
+The updater preserves user-only edits, blocks concurrent changes, backs up
+replaced or retired files, and records an operation report. See
+[`project upgrades`](docs/development/project-upgrades.md).
+
+The initializer never overwrites a non-empty output directory. Generated files,
+their owning extensions, and SHA-256 baselines are recorded in
+`.basic-structure/state.json`.
 
 Available composition primitives are documented in
 [`docs/development/extensions.md`](docs/development/extensions.md).
