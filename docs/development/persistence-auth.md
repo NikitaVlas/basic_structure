@@ -75,6 +75,10 @@ for security/bugfix minor updates and test upgrades before changing the image.
 - Authentication failures are rate-limited and do not reveal account existence.
 - User responses are allowlisted Zod DTOs without password or session fields.
 - Logs contain request IDs and event names, not email addresses or credentials.
+- Verification and reset links use one-time opaque tokens stored only as
+  digests; reset atomically revokes every active session.
+- Users can review and revoke owned sessions and see privacy-limited security
+  events.
 
 The built-in rate limiter is process-local. Before horizontally scaling the API,
 replace it with a shared atomic store such as managed Valkey/Redis.
@@ -91,9 +95,10 @@ replace it with a shared atomic store such as managed Valkey/Redis.
 
 ## Deferred capabilities
 
-Email verification, password reset, social login, MFA, distributed rate
-limiting, account lockout policy, audit-log persistence, and session management
-UI remain separate future modules.
+Durable email outbox delivery, social login, MFA, breached-password screening,
+distributed rate limiting, account lockout policy, and automated browser E2E
+coverage remain explicit future capabilities. See
+`docs/development/account-security-operations.md` for setup and residual risks.
 
 ## Document status
 

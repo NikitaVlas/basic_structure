@@ -6,7 +6,7 @@
   "name": "Secure session authentication",
   "description": "Registration, login, logout, current-user API, opaque cookie sessions, rate limiting, and browser forms.",
   "files": "template",
-  "requires": ["module:shared-contracts", "module:database-postgres", "module:observability"],
+  "requires": ["module:shared-contracts", "module:database-postgres", "module:observability", "module:transactional-email"],
   "conflicts": [],
   "contributions": {
     "API_IMPORTS": "contributions/api-imports.txt",
@@ -17,7 +17,7 @@
   },
   "packageDependencies": {
     "apps/api/package.json": {
-      "dependencies": { "@{{PROJECT_NAME}}/auth": "*" }
+      "dependencies": { "@{{PROJECT_NAME}}/auth": "*", "@{{PROJECT_NAME}}/email": "*" }
     },
     "apps/webapp/package.json": {
       "dependencies": { "@{{PROJECT_NAME}}/contracts": "*" }

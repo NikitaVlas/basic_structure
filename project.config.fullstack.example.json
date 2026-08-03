@@ -7,7 +7,7 @@
     "profile": "fullstack-web"
   },
   "surfaces": ["api", "webapp", "website"],
-  "modules": ["shared-contracts", "observability", "database-postgres", "auth-session"],
+  "modules": ["shared-contracts", "observability", "database-postgres", "transactional-email", "auth-session"],
   "adapters": ["github-ci"],
   "verification": {
     "required": true

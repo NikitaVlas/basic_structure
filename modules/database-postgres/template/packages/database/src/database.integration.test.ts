@@ -12,8 +12,8 @@ test("integration: migrations create auth tables idempotently", { skip: !process
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_name = ANY($1::text[])
        ORDER BY table_name`,
-      [["schema_migrations", "sessions", "users"]]
+      [["account_tokens", "schema_migrations", "security_audit_events", "sessions", "users"]]
     );
-    assert.deepEqual(result.rows.map(({ table_name }) => table_name), ["schema_migrations", "sessions", "users"]);
+    assert.deepEqual(result.rows.map(({ table_name }) => table_name), ["account_tokens", "schema_migrations", "security_audit_events", "sessions", "users"]);
   } finally { await pool.end(); }
 });

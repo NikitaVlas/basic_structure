@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/extension-manifest.schema.json",
+  "schemaVersion": 1,
+  "kind": "module",
+  "id": "transactional-email",
+  "name": "Transactional email",
+  "description": "Typed verification and password-reset email templates with safe console and SMTP transports.",
+  "files": "template",
+  "requires": ["module:observability"],
+  "conflicts": [],
+  "contributions": {
+    "API_ENV": "contributions/api-env.txt"
+  },
+  "packageDependencies": {
+    "apps/api/package.json": {
+      "dependencies": { "@{{PROJECT_NAME}}/email": "*" }
+    },
+    "package.json": {
+      "scripts": {
+        "email:up": "docker compose -f compose.email.yml up -d --wait",
+        "email:down": "docker compose -f compose.email.yml down"
+      }
+    }
+  }
+}

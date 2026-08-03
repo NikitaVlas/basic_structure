@@ -1,0 +1,19 @@
+.account-panel { max-width: 44rem; }
+.account-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.account-heading h2, .account-heading p { margin: 0 0 .4rem; }
+.account-heading button { width: auto; }
+.notice { margin: 1.5rem 0; padding: 1rem; border-left: .25rem solid #b86800; background: #fff7e8; }
+.notice p { margin-top: 0; }
+.notice button { width: auto; }
+.security-list, .event-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid #d6dce8; }
+.security-list li, .event-list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #d6dce8; }
+.security-list small, .event-list time { display: block; margin-top: .3rem; color: #55637a; font-size: .8rem; }
+.security-list button { width: auto; }
+.badge { margin-left: .5rem; padding: .15rem .4rem; border-radius: 999px; background: #e3ecff; color: #20438d; font-size: .7rem; }
+.danger-button { color: #8d1717; background: #fff; border: 1px solid #c78383; }
+.secondary-button { background: #fff; border: 1px solid #9aa7bd; }
+.auth-actions { display: flex; flex-wrap: wrap; gap: .25rem 1rem; }
+.auth-actions .link-button { width: auto; }
+.success { color: #166534; }
+button:focus-visible, input:focus-visible { outline: .2rem solid #315fc2; outline-offset: .15rem; }
+@media (max-width: 36rem) { .account-heading, .security-list li, .event-list li { align-items: stretch; flex-direction: column; } .security-list button { width: 100%; } }

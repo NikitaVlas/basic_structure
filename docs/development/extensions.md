@@ -24,6 +24,8 @@ Current modules:
 - `observability` — dependency-free structured logging and secret redaction;
 - `database-postgres` — PostgreSQL pooling, migrations, repositories, readiness,
   and local Docker services;
+- `transactional-email` — typed account email templates, privacy-safe local
+  capture, SMTP delivery, and a Mailpit development service;
 - `auth-session` — secure cookie sessions, authentication API, and browser flow.
 
 Modules can contribute only through named profile slots and declarative

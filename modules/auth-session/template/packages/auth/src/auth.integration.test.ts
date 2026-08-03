@@ -3,12 +3,17 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { createDatabasePool, runMigrations } from "@{{PROJECT_NAME}}/database";
 import { closeAuthResources, handleAuthRequest } from "./index.js";
+import { digestOpaqueToken } from "./session-token.js";
 
 const enabled = Boolean(process.env.TEST_DATABASE_URL);
 
 test("integration: registration, session, generic login failure, CSRF, and logout", { skip: !enabled }, async () => {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
   process.env.APP_ORIGIN = "http://localhost:5173";
+  process.env.PUBLIC_APP_URL = "http://localhost:5173";
+  process.env.EMAIL_FROM = "no-reply@example.test";
+  process.env.EMAIL_TRANSPORT = "console";
+  process.env.IP_HASH_SECRET = "integration-test-secret-with-32-characters";
   const verificationPool = createDatabasePool({ max: 2 });
   await runMigrations(verificationPool);
   await verificationPool.query("TRUNCATE sessions, users RESTART IDENTITY CASCADE");
@@ -53,7 +58,60 @@ test("integration: registration, session, generic login failure, CSRF, and logou
     assert.equal(me.status, 200);
     const meBody = await me.json();
     assert.equal(meBody.user.email, "user@example.com");
+    assert.equal(meBody.user.emailVerified, false);
     assert.equal("passwordHash" in meBody.user, false);
+    const sessionsResponse = await fetch(`${baseUrl}/api/v1/auth/sessions`, { headers: { cookie: cookieHeader } });
+    assert.equal(sessionsResponse.status, 200);
+    const sessionsBody = await sessionsResponse.json();
+    assert.equal(sessionsBody.sessions.length, 1);
+    assert.equal(sessionsBody.sessions[0].current, true);
+    assert.equal("token_digest" in sessionsBody.sessions[0], false);
+
+    const verificationRequest = await post("/api/v1/auth/email/request", {}, { cookie: cookieHeader });
+    assert.equal(verificationRequest.status, 202);
+    const verificationToken = "verification-token-that-is-at-least-32-characters";
+    await verificationPool.query(
+      `INSERT INTO account_tokens (user_id, purpose, token_digest, expires_at)
+       SELECT id, 'verify_email', $1, now() + interval '1 hour' FROM users WHERE email_normalized = $2
+       ON CONFLICT (user_id, purpose) DO UPDATE SET token_digest = EXCLUDED.token_digest, expires_at = EXCLUDED.expires_at`,
+      [digestOpaqueToken(verificationToken), "user@example.com"]
+    );
+    assert.equal((await post("/api/v1/auth/email/confirm", { token: verificationToken })).status, 204);
+    const verified = await verificationPool.query<{ email_verified_at: Date | null }>("SELECT email_verified_at FROM users WHERE email_normalized = $1", ["user@example.com"]);
+    assert.ok(verified.rows[0]?.email_verified_at);
+
+    const missingRecovery = await post("/api/v1/auth/password/forgot", { email: "absent@example.com" });
+    const existingRecovery = await post("/api/v1/auth/password/forgot", { email: "user@example.com" });
+    assert.equal(missingRecovery.status, 202);
+    assert.equal(existingRecovery.status, 202);
+    assert.deepEqual(await missingRecovery.json(), await existingRecovery.json());
+
+    const resetToken = "password-reset-token-that-is-at-least-32-characters";
+    await verificationPool.query(
+      `UPDATE account_tokens SET token_digest = $1, expires_at = now() + interval '10 minutes'
+       WHERE purpose = 'reset_password'`,
+      [digestOpaqueToken(resetToken)]
+    );
+    assert.equal((await post("/api/v1/auth/password/reset", { token: resetToken, password: "Replacement7Password" })).status, 204);
+    assert.equal((await post("/api/v1/auth/password/reset", { token: resetToken, password: "Replacement7Password" })).status, 400);
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/me`, { headers: { cookie: cookieHeader } })).status, 401);
+    assert.equal((await post("/api/v1/auth/login", { email: "user@example.com", password: "CorrectHorse7" })).status, 401);
+    const newLogin = await post("/api/v1/auth/login", { email: "user@example.com", password: "Replacement7Password" });
+    assert.equal(newLogin.status, 200);
+    const newCookie = newLogin.headers.get("set-cookie")?.split(";", 1)[0];
+    assert.ok(newCookie);
+    const events = await fetch(`${baseUrl}/api/v1/auth/security-events`, { headers: { cookie: newCookie } });
+    assert.equal(events.status, 200);
+    const eventsBody = await events.json();
+    assert.ok(eventsBody.events.length >= 1);
+    assert.equal("metadata" in eventsBody.events[0], false);
+    assert.equal("requestId" in eventsBody.events[0], false);
+    const storedEvents = await verificationPool.query<{ event_type: string }>(
+      "SELECT event_type FROM security_audit_events WHERE user_id = (SELECT id FROM users WHERE email_normalized = $1)",
+      ["user@example.com"]
+    );
+    assert.ok(storedEvents.rows.some(({ event_type }) => event_type === "email_verified"));
+    assert.ok(storedEvents.rows.some(({ event_type }) => event_type === "password_reset"));
 
     const csrf = await fetch(`${baseUrl}/api/v1/auth/logout`, { method: "POST", headers: { cookie: cookieHeader, origin: "https://evil.example" } });
     assert.equal(csrf.status, 403);

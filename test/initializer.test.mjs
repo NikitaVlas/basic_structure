@@ -63,7 +63,7 @@ test("full-stack profile composes required modules and renders package names", a
     schemaVersion: 1,
     project: { name: "reference-saas", description: "Reference SaaS", profile: "fullstack-web" },
     surfaces: ["api", "webapp", "website"],
-    modules: ["shared-contracts", "observability", "database-postgres", "auth-session"], adapters: [], verification: { required: true }
+    modules: ["shared-contracts", "observability", "database-postgres", "transactional-email", "auth-session"], adapters: [], verification: { required: true }
   };
   try {
     await initializeProject(root, output, fullstackConfig);
@@ -76,12 +76,22 @@ test("full-stack profile composes required modules and renders package names", a
     assert.match(await readFile(path.join(output, "apps", "website", "src", "pages", "index.astro"), "utf8"), /Reference SaaS/);
     assert.match(await readFile(path.join(output, "packages", "observability", "src", "index.ts"), "utf8"), /REDACTED/);
     assert.match(await readFile(path.join(output, "packages", "database", "migrations", "001_auth.sql"), "utf8"), /CREATE TABLE sessions/);
+    assert.match(await readFile(path.join(output, "packages", "database", "migrations", "002_account_security.sql"), "utf8"), /CREATE TABLE account_tokens/);
     assert.match(await readFile(path.join(output, "docker-compose.yml"), "utf8"), /postgres:18\.4-alpine/);
     const apiEnvironment = await readFile(path.join(output, "apps", "api", ".env.example"), "utf8");
     assert.match(apiEnvironment, /DATABASE_URL=/);
     assert.match(apiEnvironment, /APP_ORIGIN=/);
+    assert.match(apiEnvironment, /EMAIL_TRANSPORT=console/);
+    assert.match(apiEnvironment, /PUBLIC_APP_URL=/);
+    assert.match(await readFile(path.join(output, "compose.email.yml"), "utf8"), /axllent\/mailpit:v1\.30\.0/);
+    assert.match(await readFile(path.join(output, "packages", "email", "src", "console.ts"), "utf8"), /transactional_email_captured/);
+    const emailPackage = JSON.parse(await readFile(path.join(output, "packages", "email", "package.json"), "utf8"));
+    assert.equal(emailPackage.dependencies.nodemailer, "^9.0.3");
+    assert.equal(apiPackage.dependencies["@reference-saas/email"], "*");
     assert.match(await readFile(path.join(output, "apps", "api", "src", "server.ts"), "utf8"), /handleAuthRequest/);
+    assert.match(await readFile(path.join(output, "packages", "auth", "src", "http.ts"), "utf8"), /password\/forgot/);
     assert.match(await readFile(path.join(output, "apps", "webapp", "src", "main.tsx"), "utf8"), /<AuthPanel \/>/);
+    assert.match(await readFile(path.join(output, "apps", "webapp", "src", "auth", "AuthPanel.tsx"), "utf8"), /Active sessions/);
     assert.match(await readFile(path.join(output, "packages", "auth", "src", "password.ts"), "utf8"), /timingSafeEqual/);
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });

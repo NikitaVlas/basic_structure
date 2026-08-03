@@ -4,4 +4,6 @@ export { runMigrations } from "./migrate.js";
 export { checkDatabaseReadiness, closeDatabaseReadiness } from "./readiness.js";
 export { UserRepository } from "./users.js";
 export { SessionRepository } from "./sessions.js";
-export type { Queryable, SessionRecord, UserRecord, UserRole } from "./types.js";
+export { AccountTokenRepository } from "./account-tokens.js";
+export { SecurityAuditRepository } from "./security-audit.js";
+export type { AccountTokenPurpose, AccountTokenRecord, Queryable, SecurityAuditEventRecord, SecurityAuditOutcome, SessionRecord, UserRecord, UserRole } from "./types.js";

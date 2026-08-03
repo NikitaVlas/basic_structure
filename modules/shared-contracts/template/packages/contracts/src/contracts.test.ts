@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { apiError, apiErrorSchema, healthResponse, loginRequestSchema, paginationQuerySchema, registerRequestSchema, userDtoSchema } from "./index.js";
+import { apiError, apiErrorSchema, healthResponse, loginRequestSchema, paginationQuerySchema, passwordResetRequestSchema, registerRequestSchema, tokenRequestSchema, userDtoSchema } from "./index.js";
 
 test("health response preserves its contract", () => assert.deepEqual(healthResponse("ok"), { status: "ok" }));
 
@@ -18,8 +18,14 @@ test("login accepts legacy passwords without weakening registration policy", () 
 test("user DTO excludes persistence-only fields", () => {
   assert.equal(userDtoSchema.safeParse({
     id: "018f22ec-8dc2-7d20-8000-000000000001",
-    email: "user@example.com", role: "user", createdAt: new Date().toISOString(), passwordHash: "secret"
+    email: "user@example.com", role: "user", createdAt: new Date().toISOString(), emailVerified: false, passwordHash: "secret"
   }).success, false);
+});
+
+test("account recovery contracts reject short tokens and weak replacement passwords", () => {
+  assert.equal(tokenRequestSchema.safeParse({ token: "short" }).success, false);
+  assert.equal(passwordResetRequestSchema.safeParse({ token: "x".repeat(43), password: "weak" }).success, false);
+  assert.equal(passwordResetRequestSchema.safeParse({ token: "x".repeat(43), password: "Replacement7Password" }).success, true);
 });
 
 test("API errors require a support request ID and reject extra fields", () => {
