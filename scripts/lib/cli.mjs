@@ -7,6 +7,7 @@ import { diagnoseProject } from "./doctor.mjs";
 import { planCompositionChange, planPresetApplication, planProfileMigration } from "./composition.mjs";
 import { createExtensionScaffold, testAuthoredExtension, validateAuthoredExtension } from "./extension-authoring.mjs";
 import { configurationFromPreset, listPresets, loadPreset } from "./presets.mjs";
+import { inspectCatalogEntry, recommendCapabilities, searchCatalog } from "./catalog.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -33,6 +34,10 @@ Commands:
   list-presets  List resolved local project recipes
   diff-preset  Preview a preset against a generated project
   apply-preset  Plan or apply a preset composition
+  search     Search extensions and presets by local metadata
+  inspect    Inspect a local extension
+  inspect-preset  Inspect a resolved preset
+  recommend  Recommend a compatible capability composition
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -53,6 +58,10 @@ const COMMAND_HELP = {
   "list-presets": "Usage: basic-structure list-presets [--json]",
   "diff-preset": "Usage: basic-structure diff-preset <id> [--project <directory>] [--prune] [--json]",
   "apply-preset": "Usage: basic-structure apply-preset <id> [--project <directory>] [--plan|--apply] [--prune] [--acknowledge-migration <qualified-id>] [--json]",
+  search: "Usage: basic-structure search <query> [--kind profile|module|adapter|preset] [--json]",
+  inspect: "Usage: basic-structure inspect <profile|module|adapter> <id> [--json]",
+  "inspect-preset": "Usage: basic-structure inspect-preset <id> [--json]",
+  recommend: "Usage: basic-structure recommend --capability <id> [--capability <id>...] [--profile <id>] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -157,6 +166,25 @@ function parsePresetChange(argv, command) {
   const options = parseUpdate(argv.filter((argument) => argument !== "--prune"));
   if (command === "diff-preset" && options.apply) throw new CliError("diff-preset is plan-only.");
   return { ...options, id, prune, apply: command === "diff-preset" ? false : options.apply };
+}
+
+function parseSearch(argv) {
+  const query = argv.shift();
+  let kind;
+  for (let index = 0; index < argv.length; index += 1) if (argv[index] === "--kind") kind = takeValue(argv, index++, "--kind"); else rejectUnknown(argv[index]);
+  if (kind && !["profile", "module", "adapter", "preset"].includes(kind)) throw new CliError("--kind must be profile, module, adapter, or preset.");
+  return { query, kind };
+}
+
+function parseRecommendation(argv) {
+  const capabilities = [];
+  let profile;
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--capability") capabilities.push(takeValue(argv, index++, "--capability"));
+    else if (argv[index] === "--profile") profile = takeValue(argv, index++, "--profile");
+    else rejectUnknown(argv[index]);
+  }
+  return { capabilities, profile };
 }
 
 async function listExtensions(starterRoot, kindFilter) {
@@ -269,6 +297,24 @@ async function execute(command, argv, context) {
     if (plan.blocked) throw new CliError("Preset application is blocked by file conflicts or migration requirements.", "PRESET_BLOCKED", 2, data);
     if (options.apply) data.result = await applyProjectUpgrade(plan);
     const lines = [`PRESET ${preset.id}@${preset.version} (${plan.presetChange.mode})`, ...plan.presetChange.added.map((identity) => `ADD ${identity}`), ...plan.presetChange.removed.map((identity) => `REMOVE ${identity}`), ...plan.presetChange.automatic.map((identity) => `REQUIRED ${identity}`), ...plan.changes.filter((entry) => entry.status !== "unchanged").map((entry) => `${entry.status.toUpperCase()} ${entry.path}`), options.apply ? `Applied preset ${data.result.operationId}.` : "Plan only; no project files or configuration were changed."];
+    return success(command, data, lines);
+  }
+  if (command === "search") {
+    const options = parseSearch(argv);
+    const results = await searchCatalog(starterRoot, options.query, { kind: options.kind });
+    return success(command, { query: options.query, results }, results.map((entry) => `${entry.identity}@${entry.version} [${entry.maturity}] — ${entry.description}`));
+  }
+  if (command === "inspect" || command === "inspect-preset") {
+    const kind = command === "inspect-preset" ? "preset" : argv.shift();
+    const id = argv.shift();
+    if (!id || argv.length) throw new CliError(command === "inspect" ? "inspect requires <profile|module|adapter> <id>." : "inspect-preset requires <id>.");
+    const entry = await inspectCatalogEntry(starterRoot, kind, id);
+    return success(command, entry, [`${entry.identity}@${entry.version} [${entry.maturity}]`, entry.description, `Capabilities: ${entry.capabilities.join(", ") || "none"}`, `Tags: ${entry.tags.join(", ") || "none"}`]);
+  }
+  if (command === "recommend") {
+    const options = parseRecommendation(argv);
+    const data = await recommendCapabilities(starterRoot, options.capabilities, { profile: options.profile });
+    const lines = [`Profile: ${data.profile}`, ...data.providers.map((provider) => `SELECT ${provider.identity} — ${provider.reason}`), ...data.presetMatches.map((preset) => `PRESET ${preset.identity} (${preset.extensionCount} extensions)`), ...(data.uncovered.length ? [`UNCOVERED ${data.uncovered.join(", ")}`] : []), ...(data.compositionError ? [`INCOMPATIBLE ${data.compositionError}`] : [])];
     return success(command, data, lines);
   }
   if (command === "doctor") {

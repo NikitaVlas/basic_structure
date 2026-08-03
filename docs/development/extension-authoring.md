@@ -16,6 +16,10 @@ identity. Replace the empty template with owned generated files and declare
 requirements, conflicts, contributions, package dependencies, surfaces for a
 profile, and migrations in the manifest when applicable.
 
+Publish normalized `capabilities`, searchable `tags`, and an honest `maturity`
+value so local discovery can explain the extension. Reuse the taxonomy in
+[`capability catalog`](capability-catalog.md) when meanings match.
+
 The fixture is part of the extension contract. It must select the extension and
 all of its requirements using a representative compatible profile.
 
@@ -56,4 +60,3 @@ to participate in generation.
 - Owner: Project maintainers
 - Last reviewed: 2026-08-03
 - Related: `docs/specifications/extension-authoring-kit-design.md`
-

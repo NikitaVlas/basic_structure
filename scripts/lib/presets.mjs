@@ -4,7 +4,7 @@ import { loadExtension, pathExists, readJson, resolveConfiguration } from "./con
 import { parseSemver, parseSemverRange, satisfiesSemver } from "./semver.mjs";
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
-const KEYS = new Set(["$schema", "schemaVersion", "id", "version", "name", "description", "extends", "profile", "modules", "adapters"]);
+const KEYS = new Set(["$schema", "schemaVersion", "id", "version", "name", "description", "capabilities", "tags", "maturity", "extends", "profile", "modules", "adapters"]);
 
 export class PresetError extends Error {
   constructor(message, code = "PRESET_INVALID", exitCode = 1, data) {
@@ -22,6 +22,8 @@ function validateRawPreset(raw, expectedId) {
     try { parseSemver(raw.version); } catch { errors.push("version must be semantic MAJOR.MINOR.PATCH"); }
     if (typeof raw.name !== "string" || !raw.name.trim()) errors.push("name must be non-empty");
     if (typeof raw.description !== "string" || !raw.description.trim()) errors.push("description must be non-empty");
+    for (const key of ["capabilities", "tags"]) if (!Array.isArray(raw[key]) || new Set(raw[key]).size !== raw[key].length || raw[key].some((value) => !ID_PATTERN.test(value))) errors.push(`${key} must contain unique identifiers`);
+    if (!["experimental", "beta", "stable", "deprecated"].includes(raw.maturity)) errors.push("maturity is invalid");
     if (!Array.isArray(raw.extends) || new Set(raw.extends).size !== raw.extends.length || raw.extends.some((id) => !ID_PATTERN.test(id))) errors.push("extends must contain unique preset ids");
     if (raw.profile !== null && (!raw.profile || !ID_PATTERN.test(raw.profile.id ?? ""))) errors.push("profile must be null or an id/version object");
     if (raw.profile) try { parseSemverRange(raw.profile.version); } catch { errors.push("profile version range is invalid"); }
@@ -47,6 +49,8 @@ export async function loadPreset(starterRoot, id, trail = []) {
   const modules = {};
   const adapters = {};
   const lineage = [];
+  const capabilities = [];
+  const tags = [];
   for (const parentId of raw.extends) {
     const parent = await loadPreset(starterRoot, parentId, [...trail, id]);
     if (profile && parent.profile && profile.id !== parent.profile.id) throw new PresetError(`Preset '${id}' inherits conflicting profiles.`);
@@ -54,6 +58,8 @@ export async function loadPreset(starterRoot, id, trail = []) {
     Object.assign(modules, parent.modules);
     Object.assign(adapters, parent.adapters);
     for (const ancestor of parent.lineage) if (!lineage.includes(ancestor)) lineage.push(ancestor);
+    for (const capability of parent.capabilities) if (!capabilities.includes(capability)) capabilities.push(capability);
+    for (const tag of parent.tags) if (!tags.includes(tag)) tags.push(tag);
   }
   if (raw.profile) {
     if (profile && profile.id !== raw.profile.id) throw new PresetError(`Preset '${id}' replaces inherited profile ${profile.id}.`);
@@ -61,9 +67,11 @@ export async function loadPreset(starterRoot, id, trail = []) {
   }
   Object.assign(modules, raw.modules);
   Object.assign(adapters, raw.adapters);
+  for (const capability of raw.capabilities) if (!capabilities.includes(capability)) capabilities.push(capability);
+  for (const tag of raw.tags) if (!tags.includes(tag)) tags.push(tag);
   if (!profile) throw new PresetError(`Preset '${id}' does not resolve a profile.`);
   lineage.push(id);
-  return { id, version: raw.version, name: raw.name, description: raw.description, profile, modules, adapters, lineage, presetPath };
+  return { id, version: raw.version, name: raw.name, description: raw.description, capabilities, tags, maturity: raw.maturity, profile, modules, adapters, lineage, presetPath };
 }
 
 export async function listPresets(starterRoot) {

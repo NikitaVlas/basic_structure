@@ -72,6 +72,10 @@ export function validateExtensionManifest(manifest, expectedKind, expectedId) {
   for (const key of ["name", "description", "files"]) {
     if (typeof manifest[key] !== "string" || !manifest[key].trim()) errors.push(`${key} must be a non-empty string.`);
   }
+  for (const key of ["capabilities", "tags"]) {
+    if (manifest[key] !== undefined && (!Array.isArray(manifest[key]) || new Set(manifest[key]).size !== manifest[key].length || manifest[key].some((value) => typeof value !== "string" || !ID_PATTERN.test(value)))) errors.push(`${key} must be a unique array of lowercase kebab-case identifiers.`);
+  }
+  if (manifest.maturity !== undefined && !["experimental", "beta", "stable", "deprecated"].includes(manifest.maturity)) errors.push("maturity must be experimental, beta, stable, or deprecated.");
   if (expectedKind === "profile") {
     if (manifest.surfaces !== undefined && (!Array.isArray(manifest.surfaces) || new Set(manifest.surfaces).size !== manifest.surfaces.length || manifest.surfaces.some((value) => typeof value !== "string" || !ID_PATTERN.test(value)))) {
       errors.push("profile surfaces must be a unique array of lowercase kebab-case identifiers.");

@@ -124,6 +124,23 @@ test("CLI preset commands initialize diff and apply recipes", async () => {
   }
 });
 
+test("CLI capability catalog exposes search inspect and recommendation JSON", async () => {
+  let result = await invoke(["search", "authentication", "--kind", "module", "--json"]);
+  let envelope = JSON.parse(result.stdout);
+  assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+  assert.deepEqual(envelope.data.results.map((entry) => entry.identity), ["module:auth-session"]);
+
+  result = await invoke(["inspect-preset", "saas", "--json"]);
+  envelope = JSON.parse(result.stdout);
+  assert.ok(envelope.data.capabilities.includes("database"));
+
+  result = await invoke(["recommend", "--capability", "authentication", "--capability", "database", "--profile", "fullstack-web", "--json"]);
+  envelope = JSON.parse(result.stdout);
+  assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+  assert.equal(envelope.data.presetMatches[0].identity, "preset:saas");
+  assert.ok(envelope.data.composition.identities.includes("module:auth-session"));
+});
+
 test("CLI JSON validate and list commands expose versioned data", async () => {
   let result = await invoke(["validate", "--config", "project.config.fullstack.example.json", "--json"]);
   assert.equal(result.exitCode, 0);

@@ -25,6 +25,9 @@ testable library functions and exposes these commands:
 - `list-presets`: resolve and list composable local recipes;
 - `diff-preset`: expose a read-only preset composition plan;
 - `apply-preset`: transactionally add or exactly converge a preset;
+- `search`: query local extension and preset metadata;
+- `inspect` and `inspect-preset`: expose exact catalog evidence;
+- `recommend`: derive a read-only capability composition and preset matches;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.

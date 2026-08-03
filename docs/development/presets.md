@@ -10,6 +10,9 @@ The built-in progression is `fullstack-minimal`, `saas`, `production`,
 `security-hardened`, and `fullstack-complete`. `documentation` is the separate
 runtime-free recipe.
 
+Preset capabilities and tags inherit through `extends`; inspection also adds
+capabilities published by the resolved extensions.
+
 ## Initialize
 
 ```text
@@ -47,4 +50,3 @@ explicit operator steps after apply.
 - Owner: Project maintainers
 - Last reviewed: 2026-08-03
 - Related: `docs/specifications/preset-engine-design.md`
-

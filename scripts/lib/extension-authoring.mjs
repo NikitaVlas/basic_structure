@@ -38,6 +38,9 @@ function scaffoldManifest(kind, id, description) {
     starter: ">=0.1.0 <1.0.0",
     name: titleFromId(id),
     description: description ?? `Local ${kind} extension ${id}.`,
+    capabilities: [],
+    tags: [],
+    maturity: "experimental",
     ...(kind === "profile" ? { surfaces: [] } : {}),
     files: "template",
     requires: {},
@@ -127,4 +130,3 @@ export async function testAuthoredExtension(starterRoot, kind, id) {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
 }
-

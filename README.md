@@ -92,6 +92,15 @@ node bin/basic-structure.mjs diff-preset production --project ../example-saas
 See [`project presets`](docs/development/presets.md) before exact `--prune`
 convergence.
 
+Discover the local catalog by intent instead of memorizing extension names:
+
+```text
+node bin/basic-structure.mjs search authentication
+node bin/basic-structure.mjs recommend --capability authentication --capability database --profile fullstack-web
+```
+
+See the [`capability catalog`](docs/development/capability-catalog.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

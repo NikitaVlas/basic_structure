@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { inspectDocumentation } from "./lib/documentation.mjs";
 import { loadExtension, pathExists, readJson, resolveConfiguration } from "./lib/configuration.mjs";
 import { configurationFromPreset, listPresets } from "./lib/presets.mjs";
+import { listCatalogExtensions } from "./lib/catalog.mjs";
 
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -45,6 +46,9 @@ try {
     const catalog = await listPresets(starterRoot);
     for (const preset of catalog) await configurationFromPreset(starterRoot, preset, { name: `${preset.id}-verify`, description: preset.description });
     presets = catalog.length;
+    const catalogExtensions = await listCatalogExtensions(starterRoot);
+    const incomplete = catalogExtensions.filter((entry) => !entry.capabilities.length || !entry.tags.length || !entry.maturity);
+    if (incomplete.length) throw new Error(`Built-in catalog metadata is incomplete: ${incomplete.map((entry) => entry.identity).join(", ")}`);
   } else {
     const configPath = path.join(root, "project.config.json");
     if (!(await pathExists(configPath))) throw new Error(`Missing generated project configuration: ${configPath}`);

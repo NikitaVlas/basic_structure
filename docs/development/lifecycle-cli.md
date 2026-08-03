@@ -99,6 +99,18 @@ node bin/basic-structure.mjs apply-preset production --project ../example-saas -
 Application is additive unless exact removal is explicitly acknowledged with
 `--prune`. See [`project presets`](presets.md).
 
+### Discover capabilities
+
+```text
+node bin/basic-structure.mjs search authentication
+node bin/basic-structure.mjs inspect module auth-session
+node bin/basic-structure.mjs inspect-preset saas
+node bin/basic-structure.mjs recommend --capability authentication --profile fullstack-web
+```
+
+Discovery is local and read-only. See the
+[`capability catalog`](capability-catalog.md).
+
 ### Diagnose
 
 ```text
