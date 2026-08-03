@@ -21,7 +21,7 @@ function validateManagedPath(value) {
 }
 
 function validateState(state) {
-  if (![1, 2, 3, 4].includes(state?.schemaVersion)) throw new Error(`Unsupported generated state schema: ${state?.schemaVersion}.`);
+  if (![1, 2, 3, 4, 5].includes(state?.schemaVersion)) throw new Error(`Unsupported generated state schema: ${state?.schemaVersion}.`);
   if (typeof state.profile !== "string" || !/^[a-z][a-z0-9-]*$/.test(state.profile)) throw new Error("Generated state contains an invalid profile id.");
   for (const key of ["modules", "adapters"]) {
     if (!Array.isArray(state[key]) || new Set(state[key]).size !== state[key].length || state[key].some((id) => !/^[a-z][a-z0-9-]*$/.test(id))) {
@@ -52,7 +52,7 @@ function validateState(state) {
     if (expected.size !== recorded.size || [...expected].some((identity) => !recorded.has(identity))) {
       throw new Error("State extensionVersions must exactly match the selected profile, modules, and adapters.");
     }
-    if (state.schemaVersion === 4) {
+    if (state.schemaVersion >= 4) {
       if (!state.extensionProvenance || typeof state.extensionProvenance !== "object" || Array.isArray(state.extensionProvenance)) throw new Error("State schema 4 must contain extensionProvenance.");
       const provenanceIds = new Set(Object.keys(state.extensionProvenance));
       if (recorded.size !== provenanceIds.size || [...recorded].some((identity) => !provenanceIds.has(identity))) throw new Error("State extensionProvenance must exactly match extensionVersions.");
@@ -61,6 +61,7 @@ function validateState(state) {
         if (provenance?.source !== "activated" || !/^[a-z][a-z0-9-]*$/.test(provenance.publisher ?? "") || !/^[a-z][a-z0-9-]*$/.test(provenance.catalog ?? "") || !/^[a-f0-9]{64}$/.test(provenance.digest ?? "") || !/^[a-z][a-z0-9-]*$/.test(provenance.keyId ?? "") || !/^sha256:[a-f0-9]{64}$/.test(provenance.fingerprint ?? "") || provenance.trust !== "trusted") throw new Error(`Invalid activated provenance for ${identity}.`);
         try { parseSemver(provenance.catalogVersion); } catch { throw new Error(`Invalid catalog version provenance for ${identity}.`); }
       }
+      if(state.schemaVersion===5){if(state.adoption?.mode!=="existing-project"||!Array.isArray(state.adoption.userOwnedFiles)||!Array.isArray(state.adoption.excludedManagedPaths))throw new Error("State schema 5 must contain adoption ownership metadata.");const managed=new Set(state.generatedFiles.map((entry)=>entry.path));for(const entry of state.adoption.userOwnedFiles){validateManagedPath(entry?.path);if(entry.hashAlgorithm!=="sha256"||!/^[a-f0-9]{64}$/.test(entry.hash??""))throw new Error(`Invalid user-owned baseline for '${entry?.path}'.`);if(managed.has(entry.path))throw new Error(`Path cannot be both managed and user-owned: ${entry.path}.`);}for(const relative of state.adoption.excludedManagedPaths)validateManagedPath(relative);}
     }
   }
 }
@@ -163,7 +164,8 @@ export async function planProjectUpgrade(starterRoot, projectRoot, options = {})
   const desiredConfig = options.config ?? currentConfig;
   const configChanged = JSON.stringify(currentConfig) !== JSON.stringify(desiredConfig);
   const desiredConfigContent = Buffer.from(`${JSON.stringify(desiredConfig, null, 2)}\n`, "utf8");
-  const desired = await renderDesired(starterRoot, desiredConfig);
+  let desired = await renderDesired(starterRoot, desiredConfig);
+  if(previousState.schemaVersion===5){const excluded=new Set(previousState.adoption.excludedManagedPaths);const generatedFiles=desired.state.generatedFiles.filter((entry)=>entry.owner==="core"&&!excluded.has(entry.path));const allowed=new Set(generatedFiles.map((entry)=>entry.path));desired={...desired,state:{...desired.state,schemaVersion:5,generatedFiles,adoption:previousState.adoption},files:new Map([...desired.files].filter(([relative])=>allowed.has(relative)))};}
   validateState(desired.state);
   const extensionChanges = classifyExtensionChanges(previousState, desired, options.acknowledgements ?? []);
 

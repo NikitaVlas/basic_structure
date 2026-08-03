@@ -15,6 +15,7 @@ import { getPackageProvenance } from "./provenance.mjs";
 import { inspectCatalogBundle, installCatalogBundle, listInstalledCatalogs, removeInstalledCatalog, verifyCatalogBundleSignature } from "./catalog-bundles.mjs";
 import { addTrustedKey, readTrustStore, revokeTrustedKey } from "./trust-store.mjs";
 import { createCatalogBundle, packCatalogBundle, signCatalogBundle, testCatalogBundle } from "./catalog-authoring.mjs";
+import { applyProjectAdoption, planProjectAdoption, publicAdoptionPlan } from "./adoption.mjs";
 import { activateCatalog, createLifecycleCatalog, deactivateCatalog, listActiveCatalogs, rollbackCatalogVersion, switchCatalogVersion } from "./catalog-activation.mjs";
 
 class CliError extends Error {
@@ -30,6 +31,7 @@ const ROOT_HELP = `Usage: basic-structure <command> [options]
 
 Commands:
   init       Create or preview a generated project
+  adopt      Adopt an existing project without taking ownership of its source
   validate   Validate configuration and compatibility
   list       List local profiles, modules, and adapters
   update     Plan or apply a safe project upgrade
@@ -60,6 +62,7 @@ Global options:
 
 const COMMAND_HELP = {
   init: "Usage: basic-structure init (--config <file> | --preset <id> --name <project>) --output <empty-directory> [--description <text>] [--dry-run] [--json]",
+  adopt: "Usage: basic-structure adopt [--project <directory>] [--profile <id>] [--name <id>] [--description <text>] [--plan|--apply] [--json]",
   validate: "Usage: basic-structure validate [--config <file>] [--json]",
   list: "Usage: basic-structure list [--kind profile|module|adapter] [--json]",
   update: "Usage: basic-structure update [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
@@ -112,6 +115,8 @@ function parseInit(argv) {
   if (options.preset && !options.name) throw new CliError("--name is required with --preset.");
   return options;
 }
+
+function parseAdopt(argv){const options={project:".",profile:null,name:null,description:null,apply:false};for(let index=0;index<argv.length;index++){if(argv[index]==="--project")options.project=takeValue(argv,index++,"--project");else if(argv[index]==="--profile")options.profile=takeValue(argv,index++,"--profile");else if(argv[index]==="--name")options.name=takeValue(argv,index++,"--name");else if(argv[index]==="--description")options.description=takeValue(argv,index++,"--description");else if(argv[index]==="--apply")options.apply=true;else if(argv[index]==="--plan")options.apply=false;else rejectUnknown(argv[index]);}return options;}
 
 function parseSinglePath(argv, option, fallback) {
   let value = fallback;
@@ -237,6 +242,7 @@ async function execute(command, argv, context) {
     const data = { project: config.project.name, outputRoot: plan.outputRoot, dryRun: options.dryRun, managedFiles: plan.files.length, ...(preset ? { preset: { id: preset.id, version: preset.version, lineage: preset.lineage } } : {}) };
     return success(command, data, [`${options.dryRun ? "Planned" : "Initialized"} '${config.project.name}' at ${plan.outputRoot}.`, `Managed files: ${plan.files.length}`]);
   }
+  if(command==="adopt"){const options=parseAdopt(argv);const plan=await planProjectAdoption(starterRoot,path.resolve(cwd,options.project),options);const view=publicAdoptionPlan(plan);if(plan.blocked)throw new CliError("Project adoption is blocked by reserved control-path conflicts.","ADOPTION_BLOCKED",2,view);const result=options.apply?await applyProjectAdoption(plan):null;const data={...view,mode:options.apply?"apply":"plan",...(result?{result}:{})};return success(command,data,[`${options.apply?"ADOPTED":"PLAN adopt"} ${plan.projectRoot}`,`Profile: ${plan.profile}`,`CREATE ${view.summary.create} managed files`,`PRESERVE ${view.summary.userOwned} user-owned paths`,...(result?[`State: ${result.statePath}`,`Report: ${result.reportPath}`]:["Plan only; no project files were changed."])]);}
   if (command === "validate") {
     const configPath = parseSinglePath(argv, "--config", "project.config.json");
     const config = await readJson(path.resolve(cwd, configPath));

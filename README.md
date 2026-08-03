@@ -155,6 +155,16 @@ basic-structure search vendor-feature --project .
 
 See [`trusted catalog activation`](docs/development/trusted-catalog-activation.md).
 
+Adopt an existing repository without replacing its source or claiming it as
+generated output:
+
+```text
+basic-structure adopt --project ./existing-project --plan
+basic-structure adopt --project ./existing-project --apply
+```
+
+See [`adopting existing projects`](docs/development/adopting-existing-projects.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

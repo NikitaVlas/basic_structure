@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "starterVersion", "generatedAt", "profile", "modules", "adapters", "extensionVersions", "extensionProvenance", "generatedFiles"],
   "properties": {
-    "schemaVersion": { "const": 4 },
+    "schemaVersion": { "enum": [4, 5] },
     "starterVersion": { "type": "string", "minLength": 1 },
     "generatedAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" },
@@ -28,6 +28,20 @@
         ]
       }
     },
+    "adoption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "adoptedAt", "frameworks", "capabilities", "packageManager", "userOwnedFiles", "excludedManagedPaths"],
+      "properties": {
+        "mode": { "const": "existing-project" },
+        "adoptedAt": { "type": "string", "format": "date-time" },
+        "frameworks": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" } },
+        "capabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" } },
+        "packageManager": { "type": ["string", "null"] },
+        "userOwnedFiles": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "hashAlgorithm", "hash", "size"], "properties": { "path": { "type": "string", "minLength": 1 }, "hashAlgorithm": { "const": "sha256" }, "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "size": { "type": "integer", "minimum": 0 } } } },
+        "excludedManagedPaths": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
     "generatedFiles": {
       "type": "array",
       "items": {
@@ -42,5 +56,6 @@
         }
       }
     }
-  }
+  },
+  "allOf": [{ "if": { "properties": { "schemaVersion": { "const": 5 } } }, "then": { "required": ["adoption"] } }]
 }
