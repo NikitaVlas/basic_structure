@@ -97,6 +97,12 @@ export async function deactivateCatalog(projectRoot, publisher, id, version, app
   const index = state.catalogs.findIndex((entry) => entry.publisher === publisher && entry.id === id && entry.version === version);
   if (index < 0) throw new CatalogActivationError("Active catalog version was not found.", "CATALOG_NOT_ACTIVE");
   const [entry] = state.catalogs.slice(index, index + 1);
+  const generatedStateFile = path.join(path.resolve(projectRoot), ".basic-structure", "state.json");
+  if (await pathExists(generatedStateFile)) {
+    const generated = await readJson(generatedStateFile);
+    const selected = Object.entries(generated.extensionProvenance ?? {}).filter(([, provenance]) => provenance?.source === "activated" && provenance.publisher === publisher && provenance.catalog === id && provenance.catalogVersion === version).map(([identity]) => identity).sort();
+    if (selected.length) throw new CatalogActivationError(`Catalog is used by the generated project: ${selected.join(", ")}.`, "CATALOG_IN_USE", 1, { identities: selected });
+  }
   if (apply) {
     state.catalogs.splice(index, 1);
     await writeState(projectRoot, state);

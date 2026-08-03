@@ -63,10 +63,11 @@ async function withFixture(run) {
   }
 }
 
-test("initializer records state v3 versions and SHA-256 baselines", async () => {
+test("initializer records state v4 versions provenance and SHA-256 baselines", async () => {
   await withFixture(async ({ project }) => {
     const state = JSON.parse(await readFile(path.join(project, ".basic-structure", "state.json"), "utf8"));
-    assert.equal(state.schemaVersion, 3);
+    assert.equal(state.schemaVersion, 4);
+    assert.deepEqual(state.extensionProvenance["profile:documentation-only"], { source: "built-in" });
     assert.equal(state.starterVersion, "1.0.0");
     assert.equal(state.extensionVersions["profile:documentation-only"], "1.0.0");
     assert.ok(state.generatedFiles.every((entry) => entry.hashAlgorithm === "sha256" && /^[a-f0-9]{64}$/.test(entry.hash)));

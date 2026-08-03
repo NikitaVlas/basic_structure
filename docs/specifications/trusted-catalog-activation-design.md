@@ -16,14 +16,14 @@ content, or changed identity claims therefore fail closed. Built-in identities
 cannot be shadowed, and two active bundles cannot claim the same qualified
 extension identity.
 
-## Current activation boundary
+## Lifecycle boundary
 
-Activated extensions participate in project-scoped `search`, `inspect`, and
-capability recommendation and expose explicit provenance. Applying their
-templates through composition remains disabled until the lifecycle resolver,
-upgrade planner, generated state, and rollback engine all share the same
-multi-root catalog contract. This prevents discovery from being mistaken for
-permission to write third-party files.
+Activated extensions participate in project-scoped discovery and transactional
+composition through the same multi-root resolver. Generated state schema v4
+records immutable publisher, catalog, digest, key, fingerprint, and trust
+provenance. Update revalidates that provenance before rendering desired files,
+and the existing upgrade rollback protects configuration, state, and generated
+files. A catalog cannot be deactivated while its extensions remain selected.
 
 Bundles are data-only: activation does not execute scripts, install packages,
 follow symbolic links, or access the network.

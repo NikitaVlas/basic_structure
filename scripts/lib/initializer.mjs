@@ -131,9 +131,10 @@ async function applyPackageDependencies(outputRoot, extensions, config) {
 }
 
 export async function planInitialization(starterRoot, outputRoot, config) {
-  await assertSafeOutput(starterRoot, outputRoot);
+  const builtInRoot = typeof starterRoot === "string" ? starterRoot : starterRoot.starterRoot;
+  await assertSafeOutput(builtInRoot, outputRoot);
   const resolved = await resolveConfiguration(starterRoot, config);
-  const files = await buildCopyPlan(starterRoot, resolved);
+  const files = await buildCopyPlan(builtInRoot, resolved);
   return { outputRoot: path.resolve(outputRoot), resolved, files };
 }
 
@@ -167,13 +168,14 @@ export async function initializeProject(starterRoot, outputRoot, config, options
     hash: await hashFile(path.join(plan.outputRoot, relative), relative)
   })));
   await writeFile(path.join(stateRoot, "state.json"), `${JSON.stringify({
-    schemaVersion: 3,
+    schemaVersion: 4,
     starterVersion: plan.resolved.starterVersion,
     generatedAt: new Date().toISOString(),
     profile: config.project.profile,
     modules: config.modules,
     adapters: config.adapters,
     extensionVersions: plan.resolved.extensionVersions,
+    extensionProvenance: plan.resolved.extensionProvenance,
     generatedFiles
   }, null, 2)}\n`, "utf8");
   return plan;

@@ -14,7 +14,6 @@ test("catalog provenance is deterministic and package-scoped", async () => {
   assert.ok(first.files > 100);
   const provenance = await getPackageProvenance(root);
   assert.equal(provenance.package.name, "@basic-structure/cli");
-  assert.equal(provenance.schemas.state, 3);
+  assert.equal(provenance.schemas.state, 4);
   assert.equal(provenance.catalog.digest, first.digest);
 });
-

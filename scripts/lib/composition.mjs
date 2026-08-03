@@ -5,6 +5,7 @@ import { findUnfinishedUpgradeReports } from "./doctor.mjs";
 import { satisfiesSemver } from "./semver.mjs";
 import { configurationFromPreset } from "./presets.mjs";
 import { planProjectUpgrade } from "./upgrade.mjs";
+import { createLifecycleCatalog } from "./catalog-activation.mjs";
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 const SYNCHRONIZED_FILE_STATUSES = new Set(["unchanged", "user-modified"]);
@@ -117,6 +118,7 @@ async function addWithRequirements(starterRoot, proposed, identity, requestedIde
 }
 
 export async function planCompositionChange(starterRoot, projectRoot, request) {
+  starterRoot = await createLifecycleCatalog(starterRoot, projectRoot);
   const { action, kind, id } = request;
   if (!new Set(["add", "remove"]).has(action)) throw new CompositionError("Composition action must be add or remove.");
   assertKindAndId(kind, id);
@@ -158,6 +160,7 @@ export async function planCompositionChange(starterRoot, projectRoot, request) {
 }
 
 export async function planProfileMigration(starterRoot, projectRoot, request) {
+  starterRoot = await createLifecycleCatalog(starterRoot, projectRoot);
   const targetId = request.id;
   if (!ID_PATTERN.test(targetId ?? "")) throw new CompositionError("Profile id must be a lowercase kebab-case identifier.");
   const resolvedProject = path.resolve(projectRoot);
@@ -208,6 +211,7 @@ export async function planProfileMigration(starterRoot, projectRoot, request) {
 }
 
 export async function planPresetApplication(starterRoot, projectRoot, request) {
+  starterRoot = await createLifecycleCatalog(starterRoot, projectRoot);
   const resolvedProject = path.resolve(projectRoot);
   await assertCompositionReady(starterRoot, resolvedProject);
   const currentConfig = await readJson(path.join(resolvedProject, "project.config.json"));

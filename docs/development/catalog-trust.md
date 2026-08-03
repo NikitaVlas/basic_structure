@@ -14,12 +14,12 @@ through an independent publisher channel before `--apply`. Revocation is
 explicit and retained; a revoked key can no longer validate bundles.
 
 The signature covers `sha256:<bundleDigest>` exactly. Trust establishes key
-identity, not code safety. Signed bundles remain isolated and inactive until a
-separate trusted activation workflow is implemented.
+identity, not code safety. Signed bundles remain isolated until an explicit
+project-scoped `catalog activate --apply`; selected extensions retain immutable
+publisher provenance in generated state.
 
 ## Document status
 
 - Status: Active
 - Owner: Project maintainers
 - Last reviewed: 2026-08-03
-

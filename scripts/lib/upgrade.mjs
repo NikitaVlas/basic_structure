@@ -21,7 +21,7 @@ function validateManagedPath(value) {
 }
 
 function validateState(state) {
-  if (![1, 2, 3].includes(state?.schemaVersion)) throw new Error(`Unsupported generated state schema: ${state?.schemaVersion}.`);
+  if (![1, 2, 3, 4].includes(state?.schemaVersion)) throw new Error(`Unsupported generated state schema: ${state?.schemaVersion}.`);
   if (typeof state.profile !== "string" || !/^[a-z][a-z0-9-]*$/.test(state.profile)) throw new Error("Generated state contains an invalid profile id.");
   for (const key of ["modules", "adapters"]) {
     if (!Array.isArray(state[key]) || new Set(state[key]).size !== state[key].length || state[key].some((id) => !/^[a-z][a-z0-9-]*$/.test(id))) {
@@ -39,7 +39,7 @@ function validateState(state) {
       throw new Error(`Invalid SHA-256 baseline for '${entry.path}'.`);
     }
   }
-  if (state.schemaVersion === 3) {
+  if (state.schemaVersion >= 3) {
     if (!state.extensionVersions || typeof state.extensionVersions !== "object" || Array.isArray(state.extensionVersions)) {
       throw new Error("State schema 3 must contain extensionVersions.");
     }
@@ -51,6 +51,16 @@ function validateState(state) {
     const recorded = new Set(Object.keys(state.extensionVersions));
     if (expected.size !== recorded.size || [...expected].some((identity) => !recorded.has(identity))) {
       throw new Error("State extensionVersions must exactly match the selected profile, modules, and adapters.");
+    }
+    if (state.schemaVersion === 4) {
+      if (!state.extensionProvenance || typeof state.extensionProvenance !== "object" || Array.isArray(state.extensionProvenance)) throw new Error("State schema 4 must contain extensionProvenance.");
+      const provenanceIds = new Set(Object.keys(state.extensionProvenance));
+      if (recorded.size !== provenanceIds.size || [...recorded].some((identity) => !provenanceIds.has(identity))) throw new Error("State extensionProvenance must exactly match extensionVersions.");
+      for (const [identity, provenance] of Object.entries(state.extensionProvenance)) {
+        if (provenance?.source === "built-in") { if (Object.keys(provenance).length !== 1) throw new Error(`Invalid built-in provenance for ${identity}.`); continue; }
+        if (provenance?.source !== "activated" || !/^[a-z][a-z0-9-]*$/.test(provenance.publisher ?? "") || !/^[a-z][a-z0-9-]*$/.test(provenance.catalog ?? "") || !/^[a-f0-9]{64}$/.test(provenance.digest ?? "") || !/^[a-z][a-z0-9-]*$/.test(provenance.keyId ?? "") || !/^sha256:[a-f0-9]{64}$/.test(provenance.fingerprint ?? "") || provenance.trust !== "trusted") throw new Error(`Invalid activated provenance for ${identity}.`);
+        try { parseSemver(provenance.catalogVersion); } catch { throw new Error(`Invalid catalog version provenance for ${identity}.`); }
+      }
     }
   }
 }
@@ -115,7 +125,7 @@ function classifyExtensionChanges(previousState, desired, acknowledgements) {
     const fromVersion = previousVersions[identity] ?? null;
     const toVersion = desiredVersions[identity] ?? null;
     if (!fromVersion) {
-      const added = previousState.schemaVersion === 3;
+      const added = previousState.schemaVersion >= 3;
       return { identity, fromVersion, toVersion, status: added ? "added" : "baseline-adoption", acknowledged: true, notices: [], reason: added ? "Extension is newly selected." : "Previous state did not record this extension version." };
     }
     if (!toVersion) return { identity, fromVersion, toVersion, status: "removed", acknowledged: true, notices: [], reason: "Extension is no longer selected." };

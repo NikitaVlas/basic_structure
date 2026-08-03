@@ -4,9 +4,9 @@
   "title": "Basic Structure generated project state",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "starterVersion", "generatedAt", "profile", "modules", "adapters", "extensionVersions", "generatedFiles"],
+  "required": ["schemaVersion", "starterVersion", "generatedAt", "profile", "modules", "adapters", "extensionVersions", "extensionProvenance", "generatedFiles"],
   "properties": {
-    "schemaVersion": { "const": 3 },
+    "schemaVersion": { "const": 4 },
     "starterVersion": { "type": "string", "minLength": 1 },
     "generatedAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" },
@@ -17,6 +17,16 @@
       "type": "object",
       "propertyNames": { "pattern": "^(profile|module|adapter):[a-z][a-z0-9-]*$" },
       "additionalProperties": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" }
+    },
+    "extensionProvenance": {
+      "type": "object",
+      "propertyNames": { "pattern": "^(profile|module|adapter):[a-z][a-z0-9-]*$" },
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "object", "additionalProperties": false, "required": ["source"], "properties": { "source": { "const": "built-in" } } },
+          { "type": "object", "additionalProperties": false, "required": ["source", "publisher", "catalog", "catalogVersion", "digest", "keyId", "fingerprint", "trust"], "properties": { "source": { "const": "activated" }, "publisher": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "catalog": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "catalogVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }, "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "keyId": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, "trust": { "const": "trusted" } } }
+        ]
+      }
     },
     "generatedFiles": {
       "type": "array",

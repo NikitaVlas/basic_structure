@@ -208,7 +208,7 @@ test("CLI init dry-run and write modes preserve initializer behavior", async () 
 
     const output = await initializeFixture(temporaryRoot);
     const state = JSON.parse(await readFile(path.join(output, ".basic-structure", "state.json"), "utf8"));
-    assert.equal(state.schemaVersion, 3);
+    assert.equal(state.schemaVersion, 4);
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

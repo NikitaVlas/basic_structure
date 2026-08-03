@@ -13,7 +13,7 @@ import { checkProjectDrift, checkProjectGate } from "./gates.mjs";
 import { getPackageProvenance } from "./provenance.mjs";
 import { inspectCatalogBundle, installCatalogBundle, listInstalledCatalogs, removeInstalledCatalog, verifyCatalogBundleSignature } from "./catalog-bundles.mjs";
 import { addTrustedKey, readTrustStore, revokeTrustedKey } from "./trust-store.mjs";
-import { activateCatalog, deactivateCatalog, listActiveCatalogs } from "./catalog-activation.mjs";
+import { activateCatalog, createLifecycleCatalog, deactivateCatalog, listActiveCatalogs } from "./catalog-activation.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -249,7 +249,7 @@ async function execute(command, argv, context) {
   }
   if (command === "update") {
     const options = parseUpdate(argv);
-    const plan = await planProjectUpgrade(starterRoot, path.resolve(cwd, options.project), { acknowledgements: options.acknowledgements });
+    const projectRoot=path.resolve(cwd,options.project); const plan = await planProjectUpgrade(await createLifecycleCatalog(starterRoot,projectRoot), projectRoot, { acknowledgements: options.acknowledgements });
     const data = { mode: options.apply ? "apply" : "plan", blocked: plan.blocked, fileSummary: summarizeUpgradePlan(plan), fileChanges: plan.changes, extensionChanges: plan.extensionChanges };
     if (plan.blocked) throw new CliError("Upgrade is blocked by file conflicts or migration requirements.", "UPGRADE_BLOCKED", 2, data);
     if (options.apply) data.result = await applyProjectUpgrade(plan);

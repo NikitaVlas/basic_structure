@@ -9,7 +9,11 @@
 - Active bundles cannot be removed before deactivation.
 - Tests cover activation, provenance-bearing discovery, deactivation, and cache protection.
 
-## Deferred acceptance boundary
+## Lifecycle acceptance
 
-Third-party template application stays disabled until the multi-root lifecycle
-resolver and generated-state provenance land together with rollback coverage.
+- A multi-root resolver combines built-in and activated extensions.
+- Transactional composition renders activated templates without executing code.
+- Generated state v4 records exact extension provenance.
+- Deactivation fails while the generated project selects bundle identities.
+- End-to-end coverage proves activation, add, generated output, state evidence,
+  and the in-use guard.
