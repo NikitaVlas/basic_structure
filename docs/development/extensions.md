@@ -21,7 +21,8 @@ distinct files and declare requirements and conflicts in `module.json`.
 Current modules:
 
 - `shared-contracts` — framework-independent API contracts;
-- `observability` — dependency-free structured logging and secret redaction;
+- `observability` — correlated structured logging, recursive secret/PII
+  redaction, safe error reporting, process metrics, and API smoke probes;
 - `database-postgres` — PostgreSQL pooling, migrations, repositories, readiness,
   and local Docker services;
 - `transactional-email` — typed account email templates, privacy-safe local

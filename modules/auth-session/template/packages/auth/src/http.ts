@@ -1,9 +1,9 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { apiError, emailRequestSchema, loginRequestSchema, passwordResetRequestSchema, registerRequestSchema, tokenRequestSchema, type ApiErrorCode } from "@{{PROJECT_NAME}}/contracts";
 import { AccountTokenRepository, createDatabasePool, SecurityAuditRepository, SessionRepository, UserRepository } from "@{{PROJECT_NAME}}/database";
 import type { Pool } from "pg";
-import { log } from "@{{PROJECT_NAME}}/observability";
+import { log, requestIdFrom } from "@{{PROJECT_NAME}}/observability";
 import { createRateLimiter, RateLimitBackendUnavailableError, type RateLimiter, type RateLimitPolicy } from "@{{PROJECT_NAME}}/rate-limit";
 import { clearSessionCookie, createSessionCookie, readSessionCookie } from "./cookies.js";
 import { AuthService, EmailConflictError, InvalidAccountTokenError, InvalidCredentialsError } from "./service.js";
@@ -103,7 +103,7 @@ function validationDetails(error: { issues: Array<{ path: PropertyKey[]; message
 export async function handleAuthRequest(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://localhost");
   if (!url.pathname.startsWith("/api/v1/auth/")) return false;
-  const requestId = randomUUID();
+  const requestId = requestIdFrom(request.headers["x-request-id"]);
   setHeaders(response, requestId);
   const origin = allowedOrigin();
   if (request.headers.origin === origin) {

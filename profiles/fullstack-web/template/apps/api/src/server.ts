@@ -19,5 +19,15 @@ export function createAppServer() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number.parseInt(process.env.PORT ?? "3000", 10);
-  createAppServer().listen(port, () => console.log(JSON.stringify({ level: "info", message: "api_started", port })));
+  const server = createAppServer().listen(port, () => console.log(JSON.stringify({ level: "info", message: "api_started", port })));
+  let stopping = false;
+  async function shutdown(signal: string) {
+    if (stopping) return;
+    stopping = true;
+    console.log(JSON.stringify({ level: "info", message: "api_shutdown_started", signal }));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    {{SLOT:API_SHUTDOWN}}
+    console.log(JSON.stringify({ level: "info", message: "api_shutdown_complete" }));
+  }
+  for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => void shutdown(signal));
 }

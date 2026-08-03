@@ -41,6 +41,11 @@ Available composition primitives are documented in
   profile with shared contracts, observability, PostgreSQL, encrypted durable transactional email,
   account recovery, distributed Valkey rate limiting, session management, Docker development services, and
   isolated Playwright account-security journeys, and GitHub CI.
+
+The observability baseline includes correlated JSON logs, safe error
+fingerprints, Prometheus-compatible API/worker metrics, liveness/readiness
+probes, and graceful service shutdown. Operational guidance is in
+[`docs/development/observability-operations.md`](docs/development/observability-operations.md).
 - `schemas/project-config.schema.json` is the versioned configuration contract.
 
 Copy an example to `project.config.json`, record real product decisions, and

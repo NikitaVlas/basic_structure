@@ -15,3 +15,5 @@ test("health endpoint returns a typed response", async () => {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
+
+{{SLOT:API_TESTS}}

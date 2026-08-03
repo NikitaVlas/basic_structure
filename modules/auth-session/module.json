@@ -11,6 +11,7 @@
   "contributions": {
     "API_IMPORTS": "contributions/api-imports.txt",
     "API_REQUEST_HANDLERS": "contributions/api-request-handlers.txt",
+    "API_SHUTDOWN": "contributions/api-shutdown.txt",
     "API_ENV": "contributions/api-env.txt",
     "WEBAPP_IMPORTS": "contributions/webapp-imports.txt",
     "WEBAPP_BODY": "contributions/webapp-body.txt"

@@ -1,0 +1,13 @@
+import { createLogger, createMetricsRegistry, requestIdFrom } from "@{{PROJECT_NAME}}/observability";
+
+const apiLogger = createLogger({ service: "api", environment: process.env.NODE_ENV ?? "development" });
+const apiMetrics = createMetricsRegistry();
+const httpRequests = apiMetrics.counter("http_requests_total", "Completed HTTP requests");
+const httpDurationCount = apiMetrics.counter("http_request_duration_seconds_count", "Observed HTTP request durations");
+const httpDurationSum = apiMetrics.counter("http_request_duration_seconds_sum", "Sum of observed HTTP request durations");
+const httpActive = apiMetrics.gauge("http_requests_active", "HTTP requests currently active");
+function observableRoute(pathname: string) {
+  if (["/health", "/ready", "/metrics"].includes(pathname)) return pathname;
+  if (pathname.startsWith("/api/v1/auth/")) return "/api/v1/auth/*";
+  return "unmatched";
+}

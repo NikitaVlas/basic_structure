@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const execute = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const compose = ["--project-name", "{{PROJECT_NAME}}-e2e", "-f", "docker-compose.yml", "-f", "compose.email.yml", "-f", "compose.rate-limit.yml"];
+const composeProject = `e2e-${createHash("sha256").update(root.toLowerCase()).digest("hex").slice(0, 12)}`;
+const compose = ["--project-name", composeProject, "-f", "docker-compose.yml", "-f", "compose.email.yml", "-f", "compose.rate-limit.yml"];
 
 async function docker(...args: string[]) {
   await execute("docker", ["compose", ...compose, ...args], { cwd: root, timeout: 120_000 });

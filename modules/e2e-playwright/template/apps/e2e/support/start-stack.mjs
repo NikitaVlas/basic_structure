@@ -1,9 +1,11 @@
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const composeProject = `e2e-${createHash("sha256").update(root.toLowerCase()).digest("hex").slice(0, 12)}`;
 const envText = await readFile(path.join(root, ".env.e2e"), "utf8");
 const environment = { ...process.env };
 for (const line of envText.split(/\r?\n/)) {
@@ -29,7 +31,7 @@ async function stop(exitCode = 0) {
     Promise.all(children.map((child) => new Promise((resolve) => child.once("exit", resolve)))),
     new Promise((resolve) => setTimeout(resolve, 3000))
   ]);
-  spawnSync("docker", ["compose", "--project-name", "{{PROJECT_NAME}}-e2e", "-f", "docker-compose.yml", "-f", "compose.email.yml", "-f", "compose.rate-limit.yml", "down", "--volumes", "--remove-orphans"], { cwd: root, stdio: "inherit" });
+  spawnSync("docker", ["compose", "--project-name", composeProject, "-f", "docker-compose.yml", "-f", "compose.email.yml", "-f", "compose.rate-limit.yml", "down", "--volumes", "--remove-orphans"], { cwd: root, stdio: "inherit" });
   finish(exitCode);
 }
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => void stop(0));

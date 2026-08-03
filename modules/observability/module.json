@@ -4,8 +4,18 @@
   "kind": "module",
   "id": "observability",
   "name": "Structured observability foundation",
-  "description": "Dependency-free structured logger with secret-field redaction.",
+  "description": "Vendor-neutral structured logs, recursive redaction, correlation, safe error reporting, and Prometheus metrics.",
   "files": "template",
   "requires": [],
-  "conflicts": []
+  "conflicts": [],
+  "contributions": {
+    "API_IMPORTS": "contributions/api-imports.txt",
+    "API_REQUEST_HANDLERS": "contributions/api-request-handlers.txt",
+    "API_TESTS": "contributions/api-tests.txt"
+  },
+  "packageDependencies": {
+    "apps/api/package.json": {
+      "dependencies": { "@{{PROJECT_NAME}}/observability": "*" }
+    }
+  }
 }
