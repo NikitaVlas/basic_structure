@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, unlink } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -17,7 +17,7 @@ function sink() {
 async function invoke(argv, options = {}) {
   const stdout = sink();
   const stderr = sink();
-  const exitCode = await runCli({ argv, cwd: options.cwd ?? root, starterRoot: root, stdout: stdout.stream, stderr: stderr.stream, probeExecutable: options.probeExecutable });
+  const exitCode = await runCli({ argv, cwd: options.cwd ?? root, starterRoot: options.starterRoot ?? root, stdout: stdout.stream, stderr: stderr.stream, probeExecutable: options.probeExecutable });
   return { exitCode, stdout: stdout.read(), stderr: stderr.read() };
 }
 
@@ -57,6 +57,42 @@ test("CLI switch-profile exposes plan and apply evidence", async () => {
     envelope = JSON.parse(result.stdout);
     assert.ok(envelope.data.result.operationId);
     assert.equal(JSON.parse(await readFile(path.join(output, "project.config.json"), "utf8")).project.profile, "fullstack-web");
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("CLI extension authoring commands expose stable JSON evidence", async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "basic-structure-cli-authoring-"));
+  const starterRoot = path.join(temporaryRoot, "starter");
+  try {
+    await cp(root, starterRoot, {
+      recursive: true,
+      filter(source) {
+        const relative = path.relative(root, source).split(path.sep).join("/");
+        return !relative.startsWith(".git/") && relative !== ".git" && !relative.startsWith("node_modules/") && relative !== "node_modules" && !relative.startsWith("work/") && relative !== "work";
+      }
+    });
+    let result = await invoke(["create-extension", "module", "cli-sample", "--description", "CLI sample module.", "--json"], { starterRoot });
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    let envelope = JSON.parse(result.stdout);
+    assert.equal(envelope.data.identity, "module:cli-sample");
+    assert.equal(envelope.data.files.length, 4);
+
+    result = await invoke(["validate-extension", "module", "cli-sample", "--json"], { starterRoot });
+    envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    assert.equal(envelope.data.extensionVersions["module:cli-sample"], "1.0.0");
+
+    result = await invoke(["test-extension", "module", "cli-sample", "--json"], { starterRoot });
+    envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 0, result.stderr || result.stdout);
+    assert.equal(envelope.data.roundTrip, "remove-add");
+
+    result = await invoke(["create-extension", "module", "cli-sample", "--json"], { starterRoot });
+    envelope = JSON.parse(result.stdout);
+    assert.equal(result.exitCode, 1);
+    assert.equal(envelope.error.code, "EXTENSION_EXISTS");
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

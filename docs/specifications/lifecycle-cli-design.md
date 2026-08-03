@@ -19,6 +19,9 @@ testable library functions and exposes these commands:
 - `remove`: remove an extension only when no selected dependent requires it;
 - `switch-profile`: migrate root ownership with explicit incompatible-extension
   pruning acknowledgement;
+- `create-extension`: atomically scaffold a local extension contract;
+- `validate-extension`: validate a manifest and selected integration fixture;
+- `test-extension`: run isolated generation and supported round-trip checks;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.

@@ -74,6 +74,19 @@ node bin/basic-structure.mjs switch-profile documentation-only --project ../exam
 
 See [`profile migration`](profile-migration.md) for safety and recovery rules.
 
+### Author extensions
+
+```text
+node bin/basic-structure.mjs create-extension module payments
+node bin/basic-structure.mjs validate-extension module payments
+node bin/basic-structure.mjs test-extension module payments
+```
+
+The same commands support `profile` and `adapter`. Creation refuses existing
+destinations; validation and testing use the production resolver and generator.
+See [`extension authoring`](extension-authoring.md) for the scaffold contract and
+runtime-testing responsibilities.
+
 ### Diagnose
 
 ```text

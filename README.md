@@ -69,6 +69,18 @@ node bin/basic-structure.mjs switch-profile fullstack-web --project ../example-s
 See [`profile migration`](docs/development/profile-migration.md) before using
 `--apply` or acknowledging incompatible extension pruning.
 
+Local extension authors can scaffold and verify additions without changing the
+lifecycle core:
+
+```text
+node bin/basic-structure.mjs create-extension module payments
+node bin/basic-structure.mjs validate-extension module payments
+node bin/basic-structure.mjs test-extension module payments
+```
+
+The full workflow is documented in
+[`extension authoring`](docs/development/extension-authoring.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.

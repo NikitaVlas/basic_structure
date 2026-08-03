@@ -5,6 +5,7 @@ import { initializeProject } from "./initializer.mjs";
 import { applyProjectUpgrade, planProjectUpgrade, summarizeUpgradePlan } from "./upgrade.mjs";
 import { diagnoseProject } from "./doctor.mjs";
 import { planCompositionChange, planProfileMigration } from "./composition.mjs";
+import { createExtensionScaffold, testAuthoredExtension, validateAuthoredExtension } from "./extension-authoring.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -25,6 +26,9 @@ Commands:
   add        Add a module or adapter with required dependencies
   remove     Remove an unreferenced module or adapter
   switch-profile  Migrate the project to another profile
+  create-extension  Scaffold a local profile, module, or adapter
+  validate-extension  Validate an extension manifest and fixture
+  test-extension  Run isolated extension integration checks
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -39,6 +43,9 @@ const COMMAND_HELP = {
   add: "Usage: basic-structure add <module|adapter> <id> [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
   remove: "Usage: basic-structure remove <module|adapter> <id> [--project <directory>] [--plan|--apply] [--acknowledge-migration <qualified-id>] [--json]",
   "switch-profile": "Usage: basic-structure switch-profile <id> [--project <directory>] [--plan|--apply] [--prune-incompatible] [--acknowledge-migration <qualified-id>] [--json]",
+  "create-extension": "Usage: basic-structure create-extension <profile|module|adapter> <id> [--description <text>] [--json]",
+  "validate-extension": "Usage: basic-structure validate-extension <profile|module|adapter> <id> [--json]",
+  "test-extension": "Usage: basic-structure test-extension <profile|module|adapter> <id> [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -116,6 +123,18 @@ function parseProfileMigration(argv) {
   const pruneIncompatible = argv.includes("--prune-incompatible");
   const options = parseUpdate(argv.filter((argument) => argument !== "--prune-incompatible"));
   return { ...options, id, pruneIncompatible };
+}
+
+function parseExtensionIdentity(argv, options = {}) {
+  const kind = argv.shift();
+  const id = argv.shift();
+  if (!kind || !id) throw new CliError(`${options.command ?? "Extension command"} requires <profile|module|adapter> <id>.`);
+  let description;
+  for (let index = 0; index < argv.length; index += 1) {
+    if (options.allowDescription && argv[index] === "--description") description = takeValue(argv, index++, "--description");
+    else rejectUnknown(argv[index]);
+  }
+  return { kind, id, description };
 }
 
 async function listExtensions(starterRoot, kindFilter) {
@@ -197,6 +216,21 @@ async function execute(command, argv, context) {
       options.apply ? `Applied profile migration ${data.result.operationId}.` : "Plan only; no project files or configuration were changed."
     ];
     return success(command, data, lines);
+  }
+  if (command === "create-extension") {
+    const options = parseExtensionIdentity(argv, { command, allowDescription: true });
+    const data = await createExtensionScaffold(starterRoot, options);
+    return success(command, data, [`Created ${data.identity} at ${data.extensionRoot}.`, ...data.files.map((file) => `CREATE ${file}`), `Next: validate-extension ${options.kind} ${options.id}`]);
+  }
+  if (command === "validate-extension") {
+    const options = parseExtensionIdentity(argv, { command });
+    const data = await validateAuthoredExtension(starterRoot, options.kind, options.id);
+    return success(command, data, [`Validated ${data.identity}@${data.version}.`, `Fixture: ${data.fixturePath}`, `Selected extensions: ${Object.keys(data.extensionVersions).length}`]);
+  }
+  if (command === "test-extension") {
+    const options = parseExtensionIdentity(argv, { command });
+    const data = await testAuthoredExtension(starterRoot, options.kind, options.id);
+    return success(command, data, [`Tested ${data.identity}@${data.version}.`, `Managed files: ${data.managedFiles}`, `Round-trip: ${data.roundTrip}`]);
   }
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");
