@@ -1,0 +1,1 @@
+import { checkDatabaseReadiness } from "@{{PROJECT_NAME}}/database";

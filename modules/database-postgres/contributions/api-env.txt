@@ -1,0 +1,2 @@
+DATABASE_URL=postgresql://app:local-development-only@localhost:54329/app
+TEST_DATABASE_URL=postgresql://app_test:local-test-only@localhost:54330/app_test

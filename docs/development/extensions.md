@@ -21,7 +21,15 @@ distinct files and declare requirements and conflicts in `module.json`.
 Current modules:
 
 - `shared-contracts` — framework-independent API contracts;
-- `observability` — dependency-free structured logging and secret redaction.
+- `observability` — dependency-free structured logging and secret redaction;
+- `database-postgres` — PostgreSQL pooling, migrations, repositories, readiness,
+  and local Docker services;
+- `auth-session` — secure cookie sessions, authentication API, and browser flow.
+
+Modules can contribute only through named profile slots and declarative
+`packageDependencies`. Generation rejects missing slots, missing targets, and
+dependency version conflicts. Extension instructions are data; the initializer
+does not execute extension scripts.
 
 ## Adapters
 

@@ -1,0 +1,26 @@
+{
+  "$schema": "../../schemas/extension-manifest.schema.json",
+  "schemaVersion": 1,
+  "kind": "module",
+  "id": "auth-session",
+  "name": "Secure session authentication",
+  "description": "Registration, login, logout, current-user API, opaque cookie sessions, rate limiting, and browser forms.",
+  "files": "template",
+  "requires": ["module:shared-contracts", "module:database-postgres", "module:observability"],
+  "conflicts": [],
+  "contributions": {
+    "API_IMPORTS": "contributions/api-imports.txt",
+    "API_REQUEST_HANDLERS": "contributions/api-request-handlers.txt",
+    "API_ENV": "contributions/api-env.txt",
+    "WEBAPP_IMPORTS": "contributions/webapp-imports.txt",
+    "WEBAPP_BODY": "contributions/webapp-body.txt"
+  },
+  "packageDependencies": {
+    "apps/api/package.json": {
+      "dependencies": { "@{{PROJECT_NAME}}/auth": "*" }
+    },
+    "apps/webapp/package.json": {
+      "dependencies": { "@{{PROJECT_NAME}}/contracts": "*" }
+    }
+  }
+}

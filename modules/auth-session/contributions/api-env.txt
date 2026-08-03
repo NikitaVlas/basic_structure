@@ -1,0 +1,2 @@
+APP_ORIGIN=http://localhost:5173
+SESSION_DURATION_DAYS=7

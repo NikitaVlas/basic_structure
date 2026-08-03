@@ -1,0 +1,1 @@
+import { handleAuthRequest } from "@{{PROJECT_NAME}}/auth";

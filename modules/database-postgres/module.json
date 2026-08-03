@@ -1,0 +1,27 @@
+{
+  "$schema": "../../schemas/extension-manifest.schema.json",
+  "schemaVersion": 1,
+  "kind": "module",
+  "id": "database-postgres",
+  "name": "PostgreSQL persistence",
+  "description": "Connection pooling, ordered transactional migrations, and parameterized user/session repositories.",
+  "files": "template",
+  "requires": [],
+  "conflicts": [],
+  "contributions": {
+    "API_ENV": "contributions/api-env.txt",
+    "API_IMPORTS": "contributions/api-imports.txt",
+    "API_REQUEST_HANDLERS": "contributions/api-request-handlers.txt"
+  },
+  "packageDependencies": {
+    "package.json": {
+      "scripts": {
+        "db:migrate": "npm run migrate --workspace @{{PROJECT_NAME}}/database",
+        "db:up": "docker compose up -d --wait postgres",
+        "db:down": "docker compose down",
+        "db:test:up": "docker compose up -d --wait postgres-test",
+        "db:test:down": "docker compose stop postgres-test"
+      }
+    }
+  }
+}

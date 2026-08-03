@@ -75,6 +75,19 @@ export function validateExtensionManifest(manifest, expectedKind, expectedId) {
       errors.push(`${key} must be an array of strings.`);
     }
   }
+  if (manifest.contributions !== undefined) {
+    if (!manifest.contributions || typeof manifest.contributions !== "object" || Array.isArray(manifest.contributions)) {
+      errors.push("contributions must be an object.");
+    } else {
+      for (const [slot, contributionPath] of Object.entries(manifest.contributions)) {
+        if (!/^[A-Z][A-Z0-9_]*$/.test(slot)) errors.push(`invalid contribution slot: ${slot}.`);
+        if (typeof contributionPath !== "string" || !contributionPath.trim()) errors.push(`contribution ${slot} must reference a file.`);
+      }
+    }
+  }
+  if (manifest.packageDependencies !== undefined && (!manifest.packageDependencies || typeof manifest.packageDependencies !== "object" || Array.isArray(manifest.packageDependencies))) {
+    errors.push("packageDependencies must be an object.");
+  }
   return errors;
 }
 
@@ -89,6 +102,11 @@ export async function loadExtension(root, kind, id) {
   if (errors.length) throw new Error(`Invalid ${kind} '${id}':\n- ${errors.join("\n- ")}`);
   if (!(await pathExists(path.join(extensionRoot, manifest.files)))) {
     throw new Error(`Invalid ${kind} '${id}': files directory '${manifest.files}' does not exist.`);
+  }
+  for (const contributionPath of Object.values(manifest.contributions ?? {})) {
+    if (!(await pathExists(path.join(extensionRoot, contributionPath)))) {
+      throw new Error(`Invalid ${kind} '${id}': contribution file '${contributionPath}' does not exist.`);
+    }
   }
   return { manifest, root: extensionRoot };
 }

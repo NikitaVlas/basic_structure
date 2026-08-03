@@ -1,0 +1,9 @@
+if (request.method === "GET" && requestUrl.pathname === "/ready") {
+  try {
+    await checkDatabaseReadiness();
+    response.writeHead(200).end(JSON.stringify({ status: "ok", database: "connected" }));
+  } catch {
+    response.writeHead(503).end(JSON.stringify({ status: "degraded", database: "unavailable" }));
+  }
+  return;
+}

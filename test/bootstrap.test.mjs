@@ -19,7 +19,7 @@ test("full-stack example bootstraps a coherent repository", async () => {
 
     const rootPackage = JSON.parse(await readFile(path.join(output, "package.json"), "utf8"));
     assert.deepEqual(rootPackage.workspaces, ["apps/*", "packages/*"]);
-    assert.equal(rootPackage.scripts.verify, "npm run docs:check && npm run typecheck && npm run test && npm run build");
+    assert.equal(rootPackage.scripts.verify, "npm run docs:check && npm run security:audit && npm run typecheck && npm run test && npm run build");
     assert.match(await readFile(path.join(output, "scripts", "check-docs.mjs"), "utf8"), /inspectDocumentation/);
 
     const workflow = await readFile(path.join(output, ".github", "workflows", "verify.yml"), "utf8");

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { readJson, resolveConfiguration, validateProjectConfig } from "../scripts/lib/configuration.mjs";
+import { readJson, resolveConfiguration, validateExtensionManifest, validateProjectConfig } from "../scripts/lib/configuration.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -31,4 +31,12 @@ test("configuration rejects invalid project names", () => {
     surfaces: [], modules: [], adapters: [], verification: { required: true }
   });
   assert.ok(errors.some((error) => error.startsWith("project.name")));
+});
+
+test("extension manifests reject unsafe contribution slot names", () => {
+  const errors = validateExtensionManifest({
+    schemaVersion: 1, kind: "module", id: "sample", name: "Sample", description: "Sample module", files: "template",
+    requires: [], conflicts: [], contributions: { "../../escape": "fragment.txt" }
+  }, "module", "sample");
+  assert.ok(errors.some((error) => error.includes("invalid contribution slot")));
 });

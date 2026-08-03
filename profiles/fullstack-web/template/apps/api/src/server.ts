@@ -1,12 +1,14 @@
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 import { healthResponse } from "@{{PROJECT_NAME}}/contracts";
+{{SLOT:API_IMPORTS}}
 
 export function createAppServer() {
-  return createServer((request, response) => {
+  return createServer(async (request, response) => {
     const requestUrl = new URL(request.url ?? "/", "http://localhost");
     response.setHeader("content-type", "application/json; charset=utf-8");
     response.setHeader("x-content-type-options", "nosniff");
+    {{SLOT:API_REQUEST_HANDLERS}}
     if (request.method === "GET" && requestUrl.pathname === "/health") {
       response.writeHead(200).end(JSON.stringify(healthResponse("ok")));
       return;

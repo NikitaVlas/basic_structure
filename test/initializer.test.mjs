@@ -63,16 +63,26 @@ test("full-stack profile composes required modules and renders package names", a
     schemaVersion: 1,
     project: { name: "reference-saas", description: "Reference SaaS", profile: "fullstack-web" },
     surfaces: ["api", "webapp", "website"],
-    modules: ["shared-contracts", "observability"], adapters: [], verification: { required: true }
+    modules: ["shared-contracts", "observability", "database-postgres", "auth-session"], adapters: [], verification: { required: true }
   };
   try {
     await initializeProject(root, output, fullstackConfig);
     const apiPackage = JSON.parse(await readFile(path.join(output, "apps", "api", "package.json"), "utf8"));
     assert.equal(apiPackage.name, "@reference-saas/api");
     assert.equal(apiPackage.dependencies["@reference-saas/contracts"], "*");
+    const contractsPackage = JSON.parse(await readFile(path.join(output, "packages", "contracts", "package.json"), "utf8"));
+    assert.equal(contractsPackage.dependencies.zod, "^4.0.0");
     assert.match(await readFile(path.join(output, "apps", "webapp", "src", "main.tsx"), "utf8"), /Reference SaaS/);
     assert.match(await readFile(path.join(output, "apps", "website", "src", "pages", "index.astro"), "utf8"), /Reference SaaS/);
     assert.match(await readFile(path.join(output, "packages", "observability", "src", "index.ts"), "utf8"), /REDACTED/);
+    assert.match(await readFile(path.join(output, "packages", "database", "migrations", "001_auth.sql"), "utf8"), /CREATE TABLE sessions/);
+    assert.match(await readFile(path.join(output, "docker-compose.yml"), "utf8"), /postgres:18\.4-alpine/);
+    const apiEnvironment = await readFile(path.join(output, "apps", "api", ".env.example"), "utf8");
+    assert.match(apiEnvironment, /DATABASE_URL=/);
+    assert.match(apiEnvironment, /APP_ORIGIN=/);
+    assert.match(await readFile(path.join(output, "apps", "api", "src", "server.ts"), "utf8"), /handleAuthRequest/);
+    assert.match(await readFile(path.join(output, "apps", "webapp", "src", "main.tsx"), "utf8"), /<AuthPanel \/>/);
+    assert.match(await readFile(path.join(output, "packages", "auth", "src", "password.ts"), "utf8"), /timingSafeEqual/);
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
