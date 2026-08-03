@@ -59,6 +59,18 @@ export async function resolveActiveCatalogs(starterRoot, projectRoot) {
   return resolved;
 }
 
+export async function createLifecycleCatalog(starterRoot, projectRoot) {
+  const active = await resolveActiveCatalogs(starterRoot, projectRoot);
+  return {
+    starterRoot: path.resolve(starterRoot),
+    projectRoot: path.resolve(projectRoot),
+    roots: [
+      { root: path.resolve(starterRoot), provenance: { source: "built-in" } },
+      ...active.map((catalog) => ({ root: catalog.root, provenance: { source: "activated", publisher: catalog.publisher, catalog: catalog.id, catalogVersion: catalog.version, digest: catalog.digest, keyId: catalog.keyId, fingerprint: catalog.fingerprint, trust: catalog.trust } }))
+    ]
+  };
+}
+
 export async function activateCatalog(starterRoot, projectRoot, publisher, id, version, apply) {
   validateIdentity(publisher, id, version);
   const root = cachedRoot(projectRoot, publisher, id, version);

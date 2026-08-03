@@ -122,12 +122,27 @@ export function validateExtensionManifest(manifest, expectedKind, expectedId) {
   return errors;
 }
 
+function catalogContext(root) {
+  if (typeof root === "string") return { starterRoot: root, roots: [{ root, provenance: { source: "built-in" } }] };
+  if (!root || typeof root.starterRoot !== "string" || !Array.isArray(root.roots) || !root.roots.length) throw new Error("Invalid lifecycle catalog context.");
+  return root;
+}
+
 export async function loadExtension(root, kind, id) {
+  const context = catalogContext(root);
   const folder = `${kind}s`;
   const manifestName = kind === "profile" ? "profile.json" : `${kind}.json`;
-  const extensionRoot = path.join(root, folder, id);
-  const manifestPath = path.join(extensionRoot, manifestName);
-  if (!(await pathExists(manifestPath))) throw new Error(`Unknown ${kind} '${id}': ${manifestPath} does not exist.`);
+  let selected;
+  for (const candidate of context.roots) {
+    const extensionRoot = path.join(candidate.root, folder, id);
+    const manifestPath = path.join(extensionRoot, manifestName);
+    if (await pathExists(manifestPath)) {
+      if (selected) throw new Error(`Ambiguous ${kind} '${id}' is provided by multiple catalog roots.`);
+      selected = { extensionRoot, manifestPath, provenance: candidate.provenance };
+    }
+  }
+  if (!selected) throw new Error(`Unknown ${kind} '${id}' in the lifecycle catalog.`);
+  const { extensionRoot, manifestPath, provenance } = selected;
   const manifest = await readJson(manifestPath);
   if (kind === "profile" && manifest.surfaces === undefined) manifest.surfaces = [];
   const errors = validateExtensionManifest(manifest, kind, id);
@@ -140,7 +155,7 @@ export async function loadExtension(root, kind, id) {
       throw new Error(`Invalid ${kind} '${id}': contribution file '${contributionPath}' does not exist.`);
     }
   }
-  return { manifest, root: extensionRoot };
+  return { manifest, root: extensionRoot, provenance };
 }
 
 function assertAcyclicRequirements(extensions) {
@@ -159,13 +174,14 @@ function assertAcyclicRequirements(extensions) {
 }
 
 export async function resolveConfiguration(root, config) {
+  const context = catalogContext(root);
   const configErrors = validateProjectConfig(config);
   if (configErrors.length) throw new Error(`Invalid project configuration:\n- ${configErrors.join("\n- ")}`);
 
-  const profile = await loadExtension(root, "profile", config.project.profile);
-  const modules = await Promise.all(config.modules.map((id) => loadExtension(root, "module", id)));
-  const adapters = await Promise.all(config.adapters.map((id) => loadExtension(root, "adapter", id)));
-  const starterPackage = await readJson(path.join(root, "package.json"));
+  const profile = await loadExtension(context, "profile", config.project.profile);
+  const modules = await Promise.all(config.modules.map((id) => loadExtension(context, "module", id)));
+  const adapters = await Promise.all(config.adapters.map((id) => loadExtension(context, "adapter", id)));
+  const starterPackage = await readJson(path.join(context.starterRoot, "package.json"));
   parseSemver(starterPackage.version);
   const extensions = [profile, ...modules, ...adapters];
   const selected = new Map(extensions.map(({ manifest }) => [`${manifest.kind}:${manifest.id}`, manifest.version]));
@@ -186,5 +202,5 @@ export async function resolveConfiguration(root, config) {
     }
   }
   assertAcyclicRequirements(extensions);
-  return { profile, modules, adapters, starterVersion: starterPackage.version, extensionVersions: Object.fromEntries(selected) };
+  return { profile, modules, adapters, starterVersion: starterPackage.version, extensionVersions: Object.fromEntries(selected), extensionProvenance: Object.fromEntries(extensions.map(({ manifest, provenance }) => [`${manifest.kind}:${manifest.id}`, provenance])) };
 }
