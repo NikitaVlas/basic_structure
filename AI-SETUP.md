@@ -16,7 +16,7 @@ after the relevant decisions are clear.
 When `project.config.json` exists, validate it before generating anything:
 
 ```text
-node scripts/validate-config.mjs project.config.json
+node bin/basic-structure.mjs validate --config project.config.json
 ```
 
 Choose one profile, only the modules required by the product, and only the

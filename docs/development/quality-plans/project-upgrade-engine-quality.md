@@ -27,12 +27,12 @@ conflict.
 
 ## Verification summary
 
-- Current combined suite: 27 passed, 1 skipped because this Windows host does not permit
+- Current combined suite: 35 passed, 1 skipped because this Windows host does not permit
   symlink creation; traversal and invalid-path rejection still passed.
-- `npm run verify`: passed with 55 documents and 12 extensions.
-- Clean full-stack generation: 172 files written, including 170 hashed managed
+- `npm run verify`: passed with 58 documents and 12 extensions.
+- Clean full-stack generation: 175 files written, including 173 hashed managed
   files; state schema version 3 now also records extension versions.
-- Clean-project upgrade plan: 170 `unchanged`, no writes and no conflicts.
+- Clean-project upgrade plan: 173 `unchanged`, no writes and no conflicts.
 - `git diff --check`: passed; Git reported only expected checkout line-ending
   notices.
 

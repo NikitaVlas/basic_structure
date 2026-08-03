@@ -19,25 +19,27 @@ node scripts/verify.mjs --mode template
 Preview a generated full-stack project without writing output:
 
 ```text
-node scripts/init-project.mjs --config project.config.fullstack.example.json --output work/example --dry-run
+node bin/basic-structure.mjs init --config project.config.fullstack.example.json --output work/example --dry-run
 ```
 
 Generate it into a new or empty directory:
 
 ```text
-node scripts/init-project.mjs --config project.config.fullstack.example.json --output ../example-saas
+node bin/basic-structure.mjs init --config project.config.fullstack.example.json --output ../example-saas
 ```
 
 Preview and apply starter updates to an existing generated project:
 
 ```text
-node scripts/update-project.mjs --project ../example-saas --plan
-node scripts/update-project.mjs --project ../example-saas --apply
+node bin/basic-structure.mjs update --project ../example-saas --plan
+node bin/basic-structure.mjs update --project ../example-saas --apply
 ```
 
 The updater preserves user-only edits, blocks concurrent changes, backs up
 replaced or retired files, and records an operation report. See
 [`project upgrades`](docs/development/project-upgrades.md).
+The complete command and JSON contract is documented in the
+[`lifecycle CLI guide`](docs/development/lifecycle-cli.md).
 
 The initializer never overwrites a non-empty output directory. Generated files,
 their owning extensions, exact extension versions, and SHA-256 baselines are recorded in

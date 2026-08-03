@@ -27,17 +27,17 @@ bypass.
 
 ## Verification summary
 
-- `npm test`: 27 passed; one symlink-creation test skipped because the Windows
+- Current combined suite: 35 passed; one symlink-creation test skipped because the Windows
   host does not permit symlink creation.
 - SemVer coverage includes exact, caret, tilde, comparator, invalid syntax,
   missing requirements, incompatible selected versions, unsupported starter
   versions, requirement cycles, compatible upgrades, breaking upgrades,
   acknowledgement, downgrade rejection, and state v2 baseline adoption.
-- `npm run verify`: passed with 55 documents and 12 schema-v2 extensions.
+- `npm run verify`: passed with 58 documents and 12 schema-v2 extensions.
 - Full-stack configuration resolved starter `0.1.0` and 11 selected extensions
   at `1.0.0`.
-- Clean full-stack generation produced state schema version 3 with 170 hashed
-  managed files; a subsequent plan reported all 170 as `unchanged`.
+- Clean full-stack generation produced state schema version 3 with 173 hashed
+  managed files; a subsequent plan reported all 173 as `unchanged`.
 
 ## Known limitations
 

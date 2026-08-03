@@ -10,7 +10,7 @@ the `basic_structure` repository and point it at a project that contains
 ## Plan first
 
 ```text
-node scripts/update-project.mjs --project ../example-saas --plan
+node bin/basic-structure.mjs update --project ../example-saas --plan
 ```
 
 Planning renders the current project configuration in an isolated temporary
@@ -23,8 +23,8 @@ migration marked `required` blocks apply until the exact qualified id is
 acknowledged:
 
 ```text
-node scripts/update-project.mjs --project ../example-saas --plan --acknowledge-migration module:auth-session
-node scripts/update-project.mjs --project ../example-saas --apply --acknowledge-migration module:auth-session
+node bin/basic-structure.mjs update --project ../example-saas --plan --acknowledge-migration module:auth-session
+node bin/basic-structure.mjs update --project ../example-saas --apply --acknowledge-migration module:auth-session
 ```
 
 Acknowledgement confirms that the printed instructions were reviewed. It does
@@ -46,7 +46,7 @@ file safety remains in force.
 ## Apply
 
 ```text
-node scripts/update-project.mjs --project ../example-saas --apply
+node bin/basic-structure.mjs update --project ../example-saas --apply
 ```
 
 Apply refuses all writes if a conflict exists. Changed and retired files are
@@ -85,4 +85,4 @@ review and align the file manually. Do not add fabricated hashes to state.
 - Status: Active
 - Owner: Project maintainers
 - Last reviewed: 2026-08-03
-- Related code: `scripts/update-project.mjs`, `scripts/lib/upgrade.mjs`
+- Related code: `bin/basic-structure.mjs`, `scripts/update-project.mjs`, `scripts/lib/upgrade.mjs`

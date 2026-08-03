@@ -1,0 +1,79 @@
+# Lifecycle CLI
+
+## Entry point
+
+Run the CLI from the `basic_structure` repository:
+
+```text
+node bin/basic-structure.mjs --help
+```
+
+`npm run cli -- <command>` is equivalent. The CLI is not copied into generated
+projects and is not yet published as an npm package.
+
+## Commands
+
+### Initialize
+
+```text
+node bin/basic-structure.mjs init --config project.config.fullstack.example.json --output ../example-saas --dry-run
+node bin/basic-structure.mjs init --config project.config.fullstack.example.json --output ../example-saas
+```
+
+### Validate and inspect extensions
+
+```text
+node bin/basic-structure.mjs validate --config project.config.fullstack.example.json
+node bin/basic-structure.mjs list
+node bin/basic-structure.mjs list --kind module
+```
+
+### Update
+
+```text
+node bin/basic-structure.mjs update --project ../example-saas --plan
+node bin/basic-structure.mjs update --project ../example-saas --apply
+```
+
+Migration acknowledgement remains explicit and repeatable:
+
+```text
+node bin/basic-structure.mjs update --project ../example-saas --plan --acknowledge-migration module:auth-session
+```
+
+### Diagnose
+
+```text
+node bin/basic-structure.mjs doctor --project ../example-saas
+```
+
+Doctor is read-only. It validates the Node runtime, configuration,
+compatibility, generated state and upgrade plan, Git, conditional Docker
+requirements, verification entry point, and incomplete upgrade reports.
+
+## JSON output
+
+Add `--json` anywhere in a command. Exactly one JSON object is written to
+stdout, including for invalid, blocked, and unhealthy results:
+
+```text
+node bin/basic-structure.mjs doctor --project ../example-saas --json
+```
+
+Consumers must check both `ok` and `exitCode`. Current exit codes are `0` for
+success, `1` for invalid input or command failure, `2` for a blocked update, and
+`3` for an unhealthy doctor result.
+
+## Legacy scripts
+
+`scripts/init-project.mjs`, `scripts/validate-config.mjs`, and
+`scripts/update-project.mjs` remain available as compatibility entry points.
+New automation should use the unified CLI and its versioned JSON envelope.
+
+## Document status
+
+- Status: Active
+- Owner: Project maintainers
+- Last reviewed: 2026-08-03
+- Related code: `bin/basic-structure.mjs`, `scripts/lib/cli.mjs`, `scripts/lib/doctor.mjs`
+

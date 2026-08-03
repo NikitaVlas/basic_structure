@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": { "basic-structure": "./bin/basic-structure.mjs" },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "scripts": {
     "config:check": "node scripts/validate-config.mjs",
+    "cli": "node bin/basic-structure.mjs",
     "docs:check": "node scripts/check-docs.mjs --mode template",
     "init": "node scripts/init-project.mjs",
     "update": "node scripts/update-project.mjs",
