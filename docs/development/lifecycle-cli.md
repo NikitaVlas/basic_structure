@@ -150,6 +150,15 @@ basic-structure catalog add ./vendor/catalog --project . --plan
 
 See [`local catalog bundles`](local-catalog-bundles.md).
 
+### Manage publisher trust
+
+```text
+basic-structure trust add ./publisher-key.json --project . --plan
+basic-structure catalog verify ./vendor/catalog --project . --require-signature
+```
+
+See [`catalog trust`](catalog-trust.md).
+
 ### Diagnose
 
 ```text

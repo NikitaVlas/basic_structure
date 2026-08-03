@@ -33,6 +33,7 @@ testable library functions and exposes these commands:
 - `gate`: aggregate all read-only CI harness evidence;
 - `version`: expose package, schema, Node, and catalog digest provenance;
 - `catalog`: verify and manage immutable local bundle cache entries;
+- `trust`: manage Ed25519 publisher keys and revocation state;
 - `doctor`: perform read-only environment and project diagnostics.
 
 The legacy scripts remain compatible wrappers during this stage.

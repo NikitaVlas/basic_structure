@@ -11,7 +11,8 @@ import { inspectCatalogEntry, recommendCapabilities, searchCatalog } from "./cat
 import { checkProjectPolicies, listPolicies, loadPolicy } from "./policies.mjs";
 import { checkProjectDrift, checkProjectGate } from "./gates.mjs";
 import { getPackageProvenance } from "./provenance.mjs";
-import { inspectCatalogBundle, installCatalogBundle, listInstalledCatalogs, removeInstalledCatalog } from "./catalog-bundles.mjs";
+import { inspectCatalogBundle, installCatalogBundle, listInstalledCatalogs, removeInstalledCatalog, verifyCatalogBundleSignature } from "./catalog-bundles.mjs";
+import { addTrustedKey, readTrustStore, revokeTrustedKey } from "./trust-store.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -47,6 +48,7 @@ Commands:
   gate       Run or explain the unified read-only CI gate
   version    Show package and catalog provenance
   catalog    Inspect, verify, add, list, or remove local bundles
+  trust      List, inspect, add, or revoke publisher keys
   doctor     Run read-only project and environment diagnostics
 
 Global options:
@@ -76,6 +78,7 @@ const COMMAND_HELP = {
   gate: "Usage: basic-structure gate <check|explain> [--project <directory>] [--json]",
   version: "Usage: basic-structure version [--json]",
   catalog: "Usage: basic-structure catalog <inspect|verify|add|list|remove> [target] [--project <directory>] [--plan|--apply] [--json]",
+  trust: "Usage: basic-structure trust <list|inspect|add|revoke> [target] [--project <directory>] [--plan|--apply] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
 
@@ -385,12 +388,13 @@ async function execute(command, argv, context) {
   }
   if (command === "catalog") {
     const action = argv.shift();
-    if (action === "inspect" || action === "verify") { const target = argv.shift(); if (!target || argv.length) throw new CliError(`catalog ${action} requires <directory>.`); const data = await inspectCatalogBundle(starterRoot, path.resolve(cwd, target)); return success(command, { action, ...data }, [`VERIFIED ${data.publisher}/${data.id}@${data.version}`, `SHA256 ${data.digest}`, `Files: ${data.files}; identities: ${data.identities.length}`]); }
+    if (action === "inspect" || action === "verify") { const target = argv.shift(); if (!target) throw new CliError(`catalog ${action} requires <directory>.`); const requireSignature=argv.includes("--require-signature");const filtered=argv.filter((item)=>item!=="--require-signature");const project=parseSinglePath(filtered,"--project",".");const data = requireSignature?await verifyCatalogBundleSignature(starterRoot,path.resolve(cwd,project),path.resolve(cwd,target)):await inspectCatalogBundle(starterRoot,path.resolve(cwd,target)); return success(command, { action, ...data }, [`VERIFIED ${data.publisher}/${data.id}@${data.version}`, `SHA256 ${data.digest}`, `Trust: ${data.trust??(data.signed?"signed-unverified":"unsigned")}`]); }
     if (action === "list") { const project = parseSinglePath(argv, "--project", "."); const catalogs = await listInstalledCatalogs(path.resolve(cwd, project)); return success(command, { action, catalogs }, catalogs.map((item) => `${item.publisher}/${item.id}@${item.version}`)); }
-    if (action === "add") { const target = argv.shift(); if (!target) throw new CliError("catalog add requires <directory>."); const options = parseUpdate(argv); const data = await installCatalogBundle(starterRoot, path.resolve(cwd, options.project), path.resolve(cwd, target), options.apply); return success(command, { action, mode: options.apply ? "apply" : "plan", ...data }, [options.apply ? `INSTALLED ${data.publisher}/${data.id}@${data.version}` : `PLAN install ${data.publisher}/${data.id}@${data.version}`, `SHA256 ${data.digest}`]); }
+    if (action === "add") { const target = argv.shift(); if (!target) throw new CliError("catalog add requires <directory>."); const requireSignature=argv.includes("--require-signature");const options=parseUpdate(argv.filter((item)=>item!=="--require-signature"));const trust=requireSignature?await verifyCatalogBundleSignature(starterRoot,path.resolve(cwd,options.project),path.resolve(cwd,target)):null; const data = await installCatalogBundle(starterRoot, path.resolve(cwd, options.project), path.resolve(cwd, target), options.apply); return success(command, { action, mode: options.apply ? "apply" : "plan", ...data,...(trust?{trust:{status:trust.trust,keyId:trust.keyId,fingerprint:trust.fingerprint}}:{}) }, [options.apply ? `INSTALLED ${data.publisher}/${data.id}@${data.version}` : `PLAN install ${data.publisher}/${data.id}@${data.version}`, `SHA256 ${data.digest}`]); }
     if (action === "remove") { const identity = argv.shift(); const match = /^([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)@([0-9]+\.[0-9]+\.[0-9]+)$/.exec(identity ?? ""); if (!match) throw new CliError("catalog remove requires <publisher>/<id>@<version>."); const options = parseUpdate(argv); const data = await removeInstalledCatalog(path.resolve(cwd, options.project), match[1], match[2], match[3], options.apply); return success(command, { action, mode: options.apply ? "apply" : "plan", ...data }, [options.apply ? `REMOVED ${identity}` : `PLAN remove ${identity}`]); }
     throw new CliError("catalog requires inspect, verify, add, list, or remove.");
   }
+  if(command==="trust"){const action=argv.shift();if(action==="list"){const project=parseSinglePath(argv,"--project",".");const store=await readTrustStore(path.resolve(cwd,project));return success(command,{action,keys:store.keys},store.keys.map((key)=>`${key.publisher}/${key.keyId} [${key.status}] ${key.fingerprint}`));}if(action==="inspect"){const publisher=argv.shift();const project=parseSinglePath(argv,"--project",".");const keys=(await readTrustStore(path.resolve(cwd,project))).keys.filter((key)=>key.publisher===publisher);if(!keys.length)throw new CliError("Trusted publisher was not found.","TRUST_PUBLISHER_NOT_FOUND");return success(command,{action,publisher,keys},keys.map((key)=>`${key.publisher}/${key.keyId} [${key.status}]`));}if(action==="add"){const keyFile=argv.shift();if(!keyFile)throw new CliError("trust add requires <publisher-key.json>.");const options=parseUpdate(argv);const data=await addTrustedKey(path.resolve(cwd,options.project),path.resolve(cwd,keyFile),options.apply);return success(command,{action,mode:options.apply?"apply":"plan",...data},[options.apply?`TRUSTED ${data.entry.publisher}/${data.entry.keyId}`:`PLAN trust ${data.entry.publisher}/${data.entry.keyId}`]);}if(action==="revoke"){const identity=argv.shift();const match=/^([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)$/.exec(identity??"");if(!match)throw new CliError("trust revoke requires <publisher>/<keyId>.");const options=parseUpdate(argv);const data=await revokeTrustedKey(path.resolve(cwd,options.project),match[1],match[2],options.apply);return success(command,{action,mode:options.apply?"apply":"plan",...data},[options.apply?`REVOKED ${identity}`:`PLAN revoke ${identity}`]);}throw new CliError("trust requires list, inspect, add, or revoke.");}
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");
     const diagnosis = await diagnoseProject(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });

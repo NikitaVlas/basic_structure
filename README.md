@@ -135,6 +135,15 @@ basic-structure catalog add ./vendor/catalog --project . --plan
 
 See [`local catalog bundles`](docs/development/local-catalog-bundles.md).
 
+Require Ed25519 publisher provenance before trusting a cached bundle:
+
+```text
+basic-structure trust add ./publisher-key.json --project . --plan
+basic-structure catalog verify ./vendor/catalog --project . --require-signature
+```
+
+See [`catalog trust`](docs/development/catalog-trust.md).
+
 ### Configuration
 
 - `project.config.example.json` demonstrates a documentation-only project.
