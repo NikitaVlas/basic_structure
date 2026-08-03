@@ -1,0 +1,1 @@
+{"$schema":"../schemas/preset.schema.json","schemaVersion":1,"id":"backend-service","version":"1.0.0","name":"Backend service","description":"Minimal API service with lifecycle documentation.","capabilities":["api","backend-service"],"tags":["backend","service"],"maturity":"stable","extends":[],"profile":{"id":"backend-service","version":"^1.0.0"},"modules":{},"adapters":{}}

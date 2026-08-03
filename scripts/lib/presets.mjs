@@ -38,11 +38,15 @@ function validateRawPreset(raw, expectedId) {
   if (errors.length) throw new PresetError(`Invalid preset '${expectedId}':\n- ${errors.join("\n- ")}`);
 }
 
+function presetRoots(starterRoot){return typeof starterRoot==="string"?[{root:starterRoot,provenance:{source:"built-in"}}]:starterRoot.roots;}
+
+async function findPreset(starterRoot,id){let found;for(const candidate of presetRoots(starterRoot)){const file=path.join(candidate.root,"presets",`${id}.json`);if(await pathExists(file)){if(found)throw new PresetError(`Preset '${id}' is provided by multiple catalog roots.`,"PRESET_AMBIGUOUS");found={file,provenance:candidate.provenance};}}return found;}
+
 export async function loadPreset(starterRoot, id, trail = []) {
   if (!ID_PATTERN.test(id ?? "")) throw new PresetError("Preset id must be lowercase kebab-case.");
   if (trail.includes(id)) throw new PresetError(`Preset inheritance cycle: ${[...trail, id].join(" -> ")}.`, "PRESET_CYCLE");
-  const presetPath = path.join(starterRoot, "presets", `${id}.json`);
-  if (!(await pathExists(presetPath))) throw new PresetError(`Unknown preset '${id}'.`, "PRESET_NOT_FOUND");
+  const found=await findPreset(starterRoot,id);if(!found)throw new PresetError(`Unknown preset '${id}'.`,"PRESET_NOT_FOUND");
+  const presetPath=found.file;
   const raw = await readJson(presetPath);
   validateRawPreset(raw, id);
   let profile = null;
@@ -71,14 +75,13 @@ export async function loadPreset(starterRoot, id, trail = []) {
   for (const tag of raw.tags) if (!tags.includes(tag)) tags.push(tag);
   if (!profile) throw new PresetError(`Preset '${id}' does not resolve a profile.`);
   lineage.push(id);
-  return { id, version: raw.version, name: raw.name, description: raw.description, capabilities, tags, maturity: raw.maturity, profile, modules, adapters, lineage, presetPath };
+  return { id, version: raw.version, name: raw.name, description: raw.description, capabilities, tags, maturity: raw.maturity, profile, modules, adapters, lineage, presetPath, provenance:found.provenance };
 }
 
 export async function listPresets(starterRoot) {
-  const root = path.join(starterRoot, "presets");
-  const entries = await readdir(root, { withFileTypes: true });
+  const ids=[];for(const candidate of presetRoots(starterRoot)){const root=path.join(candidate.root,"presets");if(!(await pathExists(root)))continue;for(const entry of await readdir(root,{withFileTypes:true}))if(entry.isFile()&&entry.name.endsWith(".json"))ids.push(entry.name.slice(0,-5));}
   const results = [];
-  for (const entry of entries) if (entry.isFile() && entry.name.endsWith(".json")) results.push(await loadPreset(starterRoot, entry.name.slice(0, -5)));
+  for (const id of ids) results.push(await loadPreset(starterRoot,id));
   return results.sort((a, b) => a.id.localeCompare(b.id));
 }
 

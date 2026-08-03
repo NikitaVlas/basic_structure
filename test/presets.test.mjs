@@ -20,7 +20,7 @@ async function fixture(config, run) {
 
 test("preset inheritance resolves deterministic catalog and semantic constraints", async () => {
   const presets = await listPresets(root);
-  assert.deepEqual(presets.map((preset) => preset.id), ["documentation", "fullstack-complete", "fullstack-minimal", "production", "saas", "security-hardened"]);
+  assert.deepEqual(presets.map((preset) => preset.id), ["backend-service", "documentation", "frontend-app", "fullstack-complete", "fullstack-minimal", "node-library", "production", "saas", "security-hardened"]);
   const complete = await loadPreset(root, "fullstack-complete");
   assert.deepEqual(complete.lineage, ["fullstack-minimal", "saas", "production", "security-hardened", "fullstack-complete"]);
   assert.equal(complete.modules["auth-session"], "^1.0.0");
@@ -65,4 +65,3 @@ test("exact preset pruning removes extras transactionally", async () => {
     assert.deepEqual(config.adapters, []);
   });
 });
-

@@ -10,10 +10,12 @@ import { configurationFromPreset, listPresets, loadPreset } from "./presets.mjs"
 import { inspectCatalogEntry, recommendCapabilities, searchCatalog } from "./catalog.mjs";
 import { checkProjectPolicies, listPolicies, loadPolicy } from "./policies.mjs";
 import { checkProjectDrift, checkProjectGate } from "./gates.mjs";
+import { createHarnessEvidence } from "./harness-evidence.mjs";
 import { getPackageProvenance } from "./provenance.mjs";
 import { inspectCatalogBundle, installCatalogBundle, listInstalledCatalogs, removeInstalledCatalog, verifyCatalogBundleSignature } from "./catalog-bundles.mjs";
 import { addTrustedKey, readTrustStore, revokeTrustedKey } from "./trust-store.mjs";
-import { activateCatalog, createLifecycleCatalog, deactivateCatalog, listActiveCatalogs } from "./catalog-activation.mjs";
+import { createCatalogBundle, packCatalogBundle, signCatalogBundle, testCatalogBundle } from "./catalog-authoring.mjs";
+import { activateCatalog, createLifecycleCatalog, deactivateCatalog, listActiveCatalogs, rollbackCatalogVersion, switchCatalogVersion } from "./catalog-activation.mjs";
 
 class CliError extends Error {
   constructor(message, code = "INVALID_REQUEST", exitCode = 1, data) {
@@ -76,9 +78,9 @@ const COMMAND_HELP = {
   recommend: "Usage: basic-structure recommend --capability <id> [--capability <id>...] [--profile <id>] [--json]",
   policy: "Usage: basic-structure policy <list|explain|check|apply> [id] [--project <directory>] [--plan|--apply] [--json]",
   drift: "Usage: basic-structure drift check [--project <directory>] [--json]",
-  gate: "Usage: basic-structure gate <check|explain> [--project <directory>] [--json]",
+  gate: "Usage: basic-structure gate <check|explain|evidence> [--project <directory>] [--json]",
   version: "Usage: basic-structure version [--json]",
-  catalog: "Usage: basic-structure catalog <inspect|verify|add|list|remove|activate|deactivate|active> [target] [--project <directory>] [--plan|--apply] [--json]",
+  catalog: "Usage: basic-structure catalog <create|pack|sign|test|inspect|verify|add|list|remove|activate|deactivate|active|switch|rollback> [target] [options] [--plan|--apply] [--json]",
   trust: "Usage: basic-structure trust <list|inspect|add|revoke> [target] [--project <directory>] [--plan|--apply] [--json]",
   doctor: "Usage: basic-structure doctor [--project <directory>] [--json]"
 };
@@ -303,14 +305,14 @@ async function execute(command, argv, context) {
     return success(command, data, [`Tested ${data.identity}@${data.version}.`, `Managed files: ${data.managedFiles}`, `Round-trip: ${data.roundTrip}`]);
   }
   if (command === "list-presets") {
-    if (argv.length) rejectUnknown(argv[0]);
-    const presets = await listPresets(starterRoot);
+    const project=parseSinglePath(argv,"--project",".");const catalog=await createLifecycleCatalog(starterRoot,path.resolve(cwd,project));
+    const presets = await listPresets(catalog);
     const data = { presets: presets.map(({ presetPath, ...preset }) => preset) };
     return success(command, data, data.presets.map((preset) => `${preset.id}@${preset.version} — ${preset.description}`));
   }
   if (command === "diff-preset" || command === "apply-preset") {
     const options = parsePresetChange(argv, command);
-    const preset = await loadPreset(starterRoot, options.id);
+    const preset = await loadPreset(await createLifecycleCatalog(starterRoot,path.resolve(cwd,options.project)), options.id);
     const plan = await planPresetApplication(starterRoot, path.resolve(cwd, options.project), { preset, prune: options.prune, acknowledgements: options.acknowledgements });
     const data = { mode: options.apply ? "apply" : "plan", blocked: plan.blocked, presetChange: plan.presetChange, configChange: plan.configChange, fileSummary: summarizeUpgradePlan(plan), fileChanges: plan.changes, extensionChanges: plan.extensionChanges };
     if (plan.blocked) throw new CliError("Preset application is blocked by file conflicts or migration requirements.", "PRESET_BLOCKED", 2, data);
@@ -339,19 +341,18 @@ async function execute(command, argv, context) {
   if (command === "policy") {
     const action = argv.shift();
     if (action === "list") {
-      if (argv.length) rejectUnknown(argv[0]);
-      const policies = await listPolicies(starterRoot);
+      const project=parseSinglePath(argv,"--project",".");const policies = await listPolicies(await createLifecycleCatalog(starterRoot,path.resolve(cwd,project)));
       return success(command, { action, policies }, policies.map((policy) => `${policy.id}@${policy.version} [${policy.severity}] — ${policy.description}`));
     }
     if (action === "explain") {
-      const id = argv.shift(); if (!id || argv.length) throw new CliError("policy explain requires <id>.");
-      const policy = await loadPolicy(starterRoot, id);
+      const id = argv.shift(); if (!id) throw new CliError("policy explain requires <id>.");const project=parseSinglePath(argv,"--project",".");
+      const policy = await loadPolicy(await createLifecycleCatalog(starterRoot,path.resolve(cwd,project)), id);
       return success(command, { action, policy }, [`${policy.id}@${policy.version} [${policy.severity}]`, policy.description, `Requires capabilities: ${policy.requiresCapabilities.join(", ") || "none"}`, `Remediation preset: ${policy.remediationPreset}`]);
     }
     if (action === "check") {
       let id = null; if (argv[0] && !argv[0].startsWith("--")) id = argv.shift();
       const project = parseSinglePath(argv, "--project", ".");
-      const data = await checkProjectPolicies(starterRoot, path.resolve(cwd, project), { id });
+      const projectRoot=path.resolve(cwd,project);const data = await checkProjectPolicies(await createLifecycleCatalog(starterRoot,projectRoot), projectRoot, { id });
       if (!data.compliant) throw new CliError("Harness policy violations found.", "POLICY_VIOLATION", 4, data);
       return success(command, { action, ...data }, data.results.map((result) => `${result.status.toUpperCase()} ${result.id}: ${result.message}`));
     }
@@ -372,14 +373,14 @@ async function execute(command, argv, context) {
   if (command === "drift") {
     const action = argv.shift(); if (action !== "check") throw new CliError("drift requires check.");
     const project = parseSinglePath(argv, "--project", ".");
-    const data = await checkProjectDrift(starterRoot, path.resolve(cwd, project));
+    const projectRoot=path.resolve(cwd,project);const data = await checkProjectDrift(await createLifecycleCatalog(starterRoot,projectRoot),projectRoot);
     if (!data.clean) throw new CliError("Managed project drift detected.", "DRIFT_DETECTED", 5, data);
     return success(command, data, ["PASS drift: managed project matches the starter."]);
   }
   if (command === "gate") {
-    const action = argv.shift(); if (!new Set(["check", "explain"]).has(action)) throw new CliError("gate requires check or explain.");
+    const action = argv.shift(); if (!new Set(["check", "explain", "evidence"]).has(action)) throw new CliError("gate requires check, explain, or evidence.");
     const project = parseSinglePath(argv, "--project", ".");
-    const data = await checkProjectGate(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });
+    const projectRoot=path.resolve(cwd,project);const catalog=await createLifecycleCatalog(starterRoot,projectRoot);const data = action==="evidence"?await createHarnessEvidence(catalog,projectRoot,{probeExecutable:context.probeExecutable}):await checkProjectGate(catalog,projectRoot,{ probeExecutable: context.probeExecutable });
     if (!data.compliant) throw new CliError("CI harness gate failed.", "GATE_FAILED", 5, data);
     return success(command, { action, ...data }, data.checks.map((check) => `${check.status.toUpperCase()} ${check.id}: ${check.message}`));
   }
@@ -390,18 +391,24 @@ async function execute(command, argv, context) {
   }
   if (command === "catalog") {
     const action = argv.shift();
+    if(action==="create"){const target=argv.shift();if(!target)throw new CliError("catalog create requires <directory>.");let publisher,id,version="1.0.0",cli="^0.1.0";const apply=argv.includes("--apply");for(let index=0;index<argv.length;index++){if(argv[index]==="--apply"||argv[index]==="--plan")continue;if(argv[index]==="--publisher")publisher=takeValue(argv,index++,"--publisher");else if(argv[index]==="--id")id=takeValue(argv,index++,"--id");else if(argv[index]==="--version")version=takeValue(argv,index++,"--version");else if(argv[index]==="--cli")cli=takeValue(argv,index++,"--cli");else rejectUnknown(argv[index]);}const data=await createCatalogBundle(path.resolve(cwd,target),{publisher,id,version,cli},apply);return success(command,{action,mode:apply?"apply":"plan",...data},[apply?`CREATED ${publisher}/${id}@${version}`:`PLAN create ${publisher}/${id}@${version}`]);}
+    if(action==="pack"){const target=argv.shift();if(!target)throw new CliError("catalog pack requires <directory>.");const options=parseUpdate(argv);const data=await packCatalogBundle(path.resolve(cwd,target),options.apply);return success(command,{action,mode:options.apply?"apply":"plan",...data},[`${options.apply?"PACKED":"PLAN pack"} ${data.files} files`]);}
+    if(action==="sign"){const target=argv.shift();if(!target)throw new CliError("catalog sign requires <directory>.");let privateKey,keyId;const apply=argv.includes("--apply");for(let index=0;index<argv.length;index++){if(argv[index]==="--apply"||argv[index]==="--plan")continue;if(argv[index]==="--private-key")privateKey=takeValue(argv,index++,"--private-key");else if(argv[index]==="--key-id")keyId=takeValue(argv,index++,"--key-id");else rejectUnknown(argv[index]);}if(!privateKey||!keyId)throw new CliError("catalog sign requires --private-key and --key-id.");const data=await signCatalogBundle(starterRoot,path.resolve(cwd,target),path.resolve(cwd,privateKey),keyId,apply);return success(command,{action,mode:apply?"apply":"plan",...data},[apply?`SIGNED ${data.publisher}/${data.id}@${data.version}`:`PLAN sign ${data.publisher}/${data.id}@${data.version}`]);}
+    if(action==="test"){const target=argv.shift();if(!target)throw new CliError("catalog test requires <directory>.");const requireSignature=argv.includes("--require-signature");const project=parseSinglePath(argv.filter((item)=>item!=="--require-signature"),"--project",".");const data=await testCatalogBundle(starterRoot,path.resolve(cwd,project),path.resolve(cwd,target),requireSignature);return success(command,{action,...data},[`PASS ${data.publisher}/${data.id}@${data.version}`,`Files: ${data.files}`,`Identities: ${data.identities.length}`]);}
     if (action === "inspect" || action === "verify") { const target = argv.shift(); if (!target) throw new CliError(`catalog ${action} requires <directory>.`); const requireSignature=argv.includes("--require-signature");const filtered=argv.filter((item)=>item!=="--require-signature");const project=parseSinglePath(filtered,"--project",".");const data = requireSignature?await verifyCatalogBundleSignature(starterRoot,path.resolve(cwd,project),path.resolve(cwd,target)):await inspectCatalogBundle(starterRoot,path.resolve(cwd,target)); return success(command, { action, ...data }, [`VERIFIED ${data.publisher}/${data.id}@${data.version}`, `SHA256 ${data.digest}`, `Trust: ${data.trust??(data.signed?"signed-unverified":"unsigned")}`]); }
     if (action === "list") { const project = parseSinglePath(argv, "--project", "."); const catalogs = await listInstalledCatalogs(path.resolve(cwd, project)); return success(command, { action, catalogs }, catalogs.map((item) => `${item.publisher}/${item.id}@${item.version}`)); }
     if (action === "add") { const target = argv.shift(); if (!target) throw new CliError("catalog add requires <directory>."); const requireSignature=argv.includes("--require-signature");const options=parseUpdate(argv.filter((item)=>item!=="--require-signature"));const trust=requireSignature?await verifyCatalogBundleSignature(starterRoot,path.resolve(cwd,options.project),path.resolve(cwd,target)):null; const data = await installCatalogBundle(starterRoot, path.resolve(cwd, options.project), path.resolve(cwd, target), options.apply); return success(command, { action, mode: options.apply ? "apply" : "plan", ...data,...(trust?{trust:{status:trust.trust,keyId:trust.keyId,fingerprint:trust.fingerprint}}:{}) }, [options.apply ? `INSTALLED ${data.publisher}/${data.id}@${data.version}` : `PLAN install ${data.publisher}/${data.id}@${data.version}`, `SHA256 ${data.digest}`]); }
     if (action === "remove") { const identity = argv.shift(); const match = /^([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)@([0-9]+\.[0-9]+\.[0-9]+)$/.exec(identity ?? ""); if (!match) throw new CliError("catalog remove requires <publisher>/<id>@<version>."); const options = parseUpdate(argv); const data = await removeInstalledCatalog(path.resolve(cwd, options.project), match[1], match[2], match[3], options.apply); return success(command, { action, mode: options.apply ? "apply" : "plan", ...data }, [options.apply ? `REMOVED ${identity}` : `PLAN remove ${identity}`]); }
     if (action === "active") { const project = parseSinglePath(argv, "--project", "."); const catalogs = await listActiveCatalogs(path.resolve(cwd, project)); return success(command, { action, catalogs }, catalogs.map((item) => `${item.publisher}/${item.id}@${item.version} [${item.identities.length} identities]`)); }
     if (action === "activate" || action === "deactivate") { const identity = argv.shift(); const match = /^([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)@([0-9]+\.[0-9]+\.[0-9]+)$/.exec(identity ?? ""); if (!match) throw new CliError(`catalog ${action} requires <publisher>/<id>@<version>.`); const options = parseUpdate(argv); const project = path.resolve(cwd, options.project); const data = action === "activate" ? await activateCatalog(starterRoot, project, match[1], match[2], match[3], options.apply) : await deactivateCatalog(project, match[1], match[2], match[3], options.apply); return success(command, { action, mode: options.apply ? "apply" : "plan", ...data }, [options.apply ? `${action === "activate" ? "ACTIVATED" : "DEACTIVATED"} ${identity}` : `PLAN ${action} ${identity}`]); }
-    throw new CliError("catalog requires inspect, verify, add, list, remove, activate, deactivate, or active.");
+    if(action==="switch"){const identity=argv.shift();const match=/^([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)@([0-9]+\.[0-9]+\.[0-9]+)$/.exec(identity??"");if(!match)throw new CliError("catalog switch requires <publisher>/<id>@<version>.");const options=parseUpdate(argv);const data=await switchCatalogVersion(starterRoot,path.resolve(cwd,options.project),match[1],match[2],match[3],options.apply);return success(command,{action,mode:options.apply?"apply":"plan",...data},[options.apply?`SWITCHED ${data.from} -> ${data.to}`:`PLAN switch ${data.from} -> ${data.to}`]);}
+    if(action==="rollback"){const identity=argv.shift();const match=/^([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)$/.exec(identity??"");if(!match)throw new CliError("catalog rollback requires <publisher>/<id>.");const options=parseUpdate(argv);const data=await rollbackCatalogVersion(starterRoot,path.resolve(cwd,options.project),match[1],match[2],options.apply);return success(command,{action,mode:options.apply?"apply":"plan",...data},[options.apply?`ROLLED BACK ${data.from} -> ${data.to}`:`PLAN rollback ${data.from} -> ${data.to}`]);}
+    throw new CliError("catalog requires create, pack, sign, test, inspect, verify, add, list, remove, activate, deactivate, active, switch, or rollback.");
   }
   if(command==="trust"){const action=argv.shift();if(action==="list"){const project=parseSinglePath(argv,"--project",".");const store=await readTrustStore(path.resolve(cwd,project));return success(command,{action,keys:store.keys},store.keys.map((key)=>`${key.publisher}/${key.keyId} [${key.status}] ${key.fingerprint}`));}if(action==="inspect"){const publisher=argv.shift();const project=parseSinglePath(argv,"--project",".");const keys=(await readTrustStore(path.resolve(cwd,project))).keys.filter((key)=>key.publisher===publisher);if(!keys.length)throw new CliError("Trusted publisher was not found.","TRUST_PUBLISHER_NOT_FOUND");return success(command,{action,publisher,keys},keys.map((key)=>`${key.publisher}/${key.keyId} [${key.status}]`));}if(action==="add"){const keyFile=argv.shift();if(!keyFile)throw new CliError("trust add requires <publisher-key.json>.");const options=parseUpdate(argv);const data=await addTrustedKey(path.resolve(cwd,options.project),path.resolve(cwd,keyFile),options.apply);return success(command,{action,mode:options.apply?"apply":"plan",...data},[options.apply?`TRUSTED ${data.entry.publisher}/${data.entry.keyId}`:`PLAN trust ${data.entry.publisher}/${data.entry.keyId}`]);}if(action==="revoke"){const identity=argv.shift();const match=/^([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)$/.exec(identity??"");if(!match)throw new CliError("trust revoke requires <publisher>/<keyId>.");const options=parseUpdate(argv);const data=await revokeTrustedKey(path.resolve(cwd,options.project),match[1],match[2],options.apply);return success(command,{action,mode:options.apply?"apply":"plan",...data},[options.apply?`REVOKED ${identity}`:`PLAN revoke ${identity}`]);}throw new CliError("trust requires list, inspect, add, or revoke.");}
   if (command === "doctor") {
     const project = parseSinglePath(argv, "--project", ".");
-    const diagnosis = await diagnoseProject(starterRoot, path.resolve(cwd, project), { probeExecutable: context.probeExecutable });
+    const projectRoot=path.resolve(cwd,project);const diagnosis = await diagnoseProject(await createLifecycleCatalog(starterRoot,projectRoot),projectRoot,{ probeExecutable: context.probeExecutable });
     if (!diagnosis.healthy) throw new CliError("Doctor found required failing checks.", "DOCTOR_UNHEALTHY", 3, diagnosis);
     return success(command, diagnosis, diagnosis.checks.map((entry) => `${entry.status.toUpperCase().padEnd(4)} ${entry.id}: ${entry.message}`));
   }
@@ -418,7 +425,8 @@ export async function runCli(options) {
   const raw = [...(options.argv ?? [])];
   const json = raw.includes("--json");
   const argv = raw.filter((argument) => argument !== "--json");
-  const command = argv.shift();
+  let command = argv.shift();
+  if(command==="--version"||command==="-V")command="version";
   if (!command || command === "--help" || command === "-h" || command === "help") {
     const help = command === "help" && argv[0] ? COMMAND_HELP[argv[0]] : ROOT_HELP;
     if (!help) {

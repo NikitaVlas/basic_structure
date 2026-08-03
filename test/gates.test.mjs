@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { checkProjectDrift, checkProjectGate } from "../scripts/lib/gates.mjs";
 import { initializeProject } from "../scripts/lib/initializer.mjs";
 import { configurationFromPreset, loadPreset } from "../scripts/lib/presets.mjs";
+import { createHarnessEvidence } from "../scripts/lib/harness-evidence.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const probe = (command) => ({ available: true, version: `${command} test` });
@@ -20,3 +21,4 @@ test("managed edits fail drift and policy gate with evidence", async () => {
   await fixture(async (project) => { await writeFile(path.join(project, "AGENTS.md"), "changed managed file\n", "utf8"); const drift = await checkProjectDrift(root, project); assert.equal(drift.clean, false); assert.equal(drift.changes.find((entry) => entry.path === "AGENTS.md").status, "user-modified"); const gate = await checkProjectGate(root, project, { probeExecutable: probe }); assert.equal(gate.compliant, false); assert.equal(gate.checks.find((entry) => entry.id === "drift").status, "fail"); });
 });
 
+test("harness evidence is deterministic and includes state provenance",async()=>{await fixture(async(project)=>{const first=await createHarnessEvidence(root,project,{probeExecutable:probe});const second=await createHarnessEvidence(root,project,{probeExecutable:probe});assert.equal(first.compliant,true);assert.match(first.digest.value,/^[a-f0-9]{64}$/);assert.equal(first.digest.value,second.digest.value);assert.equal(first.state.schemaVersion,4);assert.deepEqual(first.state.extensionProvenance["profile:documentation-only"],{source:"built-in"});});});

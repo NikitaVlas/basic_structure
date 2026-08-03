@@ -38,6 +38,8 @@
     "update": "node scripts/update-project.mjs",
     "test": "node --test test/*.test.mjs",
     "verify": "node scripts/verify.mjs --mode template",
-    "package:check": "node scripts/verify-package.mjs"
+    "benchmark": "node scripts/benchmark.mjs",
+    "package:check": "node scripts/verify-package.mjs",
+    "release:check": "node scripts/release-check.mjs"
   }
 }

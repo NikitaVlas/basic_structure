@@ -109,3 +109,36 @@ export async function deactivateCatalog(projectRoot, publisher, id, version, app
   }
   return { identity: `${publisher}/${id}@${version}`, entry, applied: Boolean(apply) };
 }
+
+export async function switchCatalogVersion(starterRoot, projectRoot, publisher, id, version, apply) {
+  validateIdentity(publisher,id,version);
+  const state=await readCatalogActivationState(projectRoot);
+  const index=state.catalogs.findIndex((entry)=>entry.publisher===publisher&&entry.id===id);
+  if(index<0)throw new CatalogActivationError("Catalog is not active.","CATALOG_NOT_ACTIVE");
+  const current=state.catalogs[index];
+  if(current.version===version)throw new CatalogActivationError("Requested catalog version is already active.","CATALOG_ALREADY_ACTIVE");
+  const root=cachedRoot(projectRoot,publisher,id,version);
+  if(!(await pathExists(root)))throw new CatalogActivationError("Target catalog version is not installed.","CATALOG_NOT_INSTALLED");
+  const verified=await verifyCatalogBundleSignature(starterRoot,projectRoot,root);
+  const claimed=new Set(state.catalogs.filter((_,candidate)=>candidate!==index).flatMap((entry)=>entry.identities));
+  const collisions=verified.identities.filter((identity)=>claimed.has(identity));
+  if(collisions.length)throw new CatalogActivationError(`Active catalog identity collision: ${collisions.join(", ")}.`,"CATALOG_ACTIVE_IDENTITY_COLLISION",1,{collisions});
+  const generatedStateFile=path.join(path.resolve(projectRoot),".basic-structure","state.json");
+  if(await pathExists(generatedStateFile)){
+    const generated=await readJson(generatedStateFile);
+    const selected=Object.entries(generated.extensionProvenance??{}).filter(([,provenance])=>provenance?.source==="activated"&&provenance.publisher===publisher&&provenance.catalog===id).map(([identity])=>identity);
+    const missing=selected.filter((identity)=>!verified.identities.includes(identity));
+    if(missing.length)throw new CatalogActivationError(`Target version removes selected identities: ${missing.join(", ")}.`,"CATALOG_SWITCH_INCOMPATIBLE",1,{missing});
+  }
+  const entry={publisher,id,version,digest:verified.digest,keyId:verified.keyId,fingerprint:verified.fingerprint,identities:verified.identities,activatedAt:new Date().toISOString(),previousVersion:current.version};
+  if(apply){state.catalogs[index]=entry;await writeState(projectRoot,state);}
+  return{from:`${publisher}/${id}@${current.version}`,to:`${publisher}/${id}@${version}`,entry,applied:Boolean(apply)};
+}
+
+export async function rollbackCatalogVersion(starterRoot,projectRoot,publisher,id,apply){
+  if(!ID.test(publisher??"")||!ID.test(id??""))throw new CatalogActivationError("Publisher and catalog id must be lowercase kebab-case.");
+  const active=(await readCatalogActivationState(projectRoot)).catalogs.find((entry)=>entry.publisher===publisher&&entry.id===id);
+  if(!active)throw new CatalogActivationError("Catalog is not active.","CATALOG_NOT_ACTIVE");
+  if(!active.previousVersion)throw new CatalogActivationError("Catalog has no previous active version.","CATALOG_ROLLBACK_UNAVAILABLE");
+  return switchCatalogVersion(starterRoot,projectRoot,publisher,id,active.previousVersion,apply);
+}

@@ -17,17 +17,19 @@ function validate(policy, id) {
   if (!ID.test(policy.remediationPreset ?? "")) throw new PolicyError(`Invalid remediation preset in ${id}.`);
 }
 
+function policyRoots(starterRoot){return typeof starterRoot==="string"?[{root:starterRoot,provenance:{source:"built-in"}}]:starterRoot.roots;}
+async function findPolicy(starterRoot,id){let found;for(const candidate of policyRoots(starterRoot)){const file=path.join(candidate.root,"policies",`${id}.json`);if(await pathExists(file)){if(found)throw new PolicyError(`Policy '${id}' is provided by multiple catalog roots.`,"POLICY_AMBIGUOUS");found={file,provenance:candidate.provenance};}}return found;}
+
 export async function loadPolicy(starterRoot, id) {
   if (!ID.test(id ?? "")) throw new PolicyError("Policy id must be lowercase kebab-case.");
-  const file = path.join(starterRoot, "policies", `${id}.json`);
-  if (!(await pathExists(file))) throw new PolicyError(`Unknown policy '${id}'.`, "POLICY_NOT_FOUND");
-  const policy = await readJson(file); validate(policy, id); return policy;
+  const found=await findPolicy(starterRoot,id);if(!found)throw new PolicyError(`Unknown policy '${id}'.`,"POLICY_NOT_FOUND");
+  const policy = await readJson(found.file); validate(policy, id); return {...policy,provenance:found.provenance};
 }
 
 export async function listPolicies(starterRoot) {
-  const entries = await readdir(path.join(starterRoot, "policies"), { withFileTypes: true });
+  const ids=[];for(const candidate of policyRoots(starterRoot)){const root=path.join(candidate.root,"policies");if(!(await pathExists(root)))continue;for(const entry of await readdir(root,{withFileTypes:true}))if(entry.isFile()&&entry.name.endsWith(".json"))ids.push(entry.name.slice(0,-5));}
   const policies = [];
-  for (const entry of entries) if (entry.isFile() && entry.name.endsWith(".json")) policies.push(await loadPolicy(starterRoot, entry.name.slice(0, -5)));
+  for (const id of ids) policies.push(await loadPolicy(starterRoot,id));
   return policies.sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -59,4 +61,3 @@ export async function checkProjectPolicies(starterRoot, projectRoot, options = {
   const violations = results.filter((result) => result.status === "fail" && result.severity === "error");
   return { projectRoot: root, compliant: !violations.length, capabilities: [...capabilities].sort(), results };
 }
-

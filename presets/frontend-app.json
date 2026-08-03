@@ -1,0 +1,1 @@
+{"$schema":"../schemas/preset.schema.json","schemaVersion":1,"id":"frontend-app","version":"1.0.0","name":"Frontend app","description":"Framework-neutral browser application baseline.","capabilities":["web-application","frontend-app"],"tags":["frontend","web"],"maturity":"stable","extends":[],"profile":{"id":"frontend-app","version":"^1.0.0"},"modules":{},"adapters":{}}

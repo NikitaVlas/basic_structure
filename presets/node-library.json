@@ -1,0 +1,1 @@
+{"$schema":"../schemas/preset.schema.json","schemaVersion":1,"id":"node-library","version":"1.0.0","name":"Node library","description":"ESM package with public exports and tests.","capabilities":["library","package"],"tags":["node","library"],"maturity":"stable","extends":[],"profile":{"id":"node-library","version":"^1.0.0"},"modules":{},"adapters":{}}

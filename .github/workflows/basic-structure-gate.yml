@@ -10,14 +10,16 @@ permissions:
 
 jobs:
   gate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Test lifecycle gates
-        run: node --test test/gates.test.mjs test/policies.test.mjs test/cli.test.mjs
-      - name: Verify starter catalog
-        run: node scripts/verify.mjs --mode template
+      - name: Run release readiness gate
+        run: npm run release:check
